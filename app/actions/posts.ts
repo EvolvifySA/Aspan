@@ -1,7 +1,7 @@
 'use server'
 
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { posts } from '@/lib/db/schema'
 import { demoPosts, isDatabaseConfigured } from '@/lib/demo-posts'
 import { del, put } from '@vercel/blob'
@@ -14,6 +14,10 @@ import path from 'node:path'
 
 const LOCAL_UPLOAD_PREFIX = '/uploads/'
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
+
+async function ensurePostsImageUrlsColumn() {
+  await pool.query('ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "imageUrls" jsonb')
+}
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -69,7 +73,12 @@ export async function getPosts() {
   }
 
   try {
-    return await db.select().from(posts).orderBy(desc(posts.createdAt))
+    await ensurePostsImageUrlsColumn()
+    const records = await db.select().from(posts).orderBy(desc(posts.createdAt))
+    return records.map((post) => ({
+      ...post,
+      imageUrls: Array.isArray(post.imageUrls) ? post.imageUrls : [post.imageUrl],
+    }))
   } catch {
     return demoPosts
   }
@@ -83,19 +92,23 @@ export async function createPost(formData: FormData) {
   }
 
   const userId = await getUserId()
+  await ensurePostsImageUrlsColumn()
 
-  const file = formData.get('image') as File | null
+  const files = formData
+    .getAll('images')
+    .filter((value): value is File => value instanceof File && value.size > 0)
   const caption = (formData.get('caption') as string | null)?.trim() ?? ''
 
-  if (!file || file.size === 0) {
-    throw new Error('Selecione uma imagem para publicar.')
+  if (files.length === 0) {
+    throw new Error('Selecione pelo menos uma imagem para publicar.')
   }
 
-  const imageUrl = await uploadPostImage(file)
+  const imageUrls = await Promise.all(files.map((file) => uploadPostImage(file)))
 
   await db.insert(posts).values({
     userId,
-    imageUrl,
+    imageUrl: imageUrls[0],
+    imageUrls,
     caption,
   })
 
@@ -113,13 +126,16 @@ export async function deletePost(id: number) {
   // Conteúdo institucional gerenciado coletivamente: qualquer admin
   // autenticado pode remover um post.
   await getUserId()
+  await ensurePostsImageUrlsColumn()
   const [post] = await db
-    .select({ imageUrl: posts.imageUrl })
+    .select({ imageUrl: posts.imageUrl, imageUrls: posts.imageUrls })
     .from(posts)
     .where(eq(posts.id, id))
     .limit(1)
   await db.delete(posts).where(eq(posts.id, id))
-  if (post?.imageUrl) await deletePostImage(post.imageUrl)
+  const imageUrls = Array.isArray(post?.imageUrls) ? post.imageUrls : []
+  const uniqueUrls = [...new Set([post?.imageUrl, ...imageUrls].filter(Boolean))]
+  await Promise.all(uniqueUrls.map((imageUrl) => deletePostImage(String(imageUrl))))
 
   revalidatePath('/atualizacoes')
   revalidatePath('/admin')

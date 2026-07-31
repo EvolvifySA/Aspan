@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS "posts" (
   "id" serial PRIMARY KEY,
   "userId" text NOT NULL,
   "imageUrl" text NOT NULL,
+  "imageUrls" jsonb,
   "caption" text NOT NULL DEFAULT '',
   "createdAt" timestamp NOT NULL DEFAULT now()
 );

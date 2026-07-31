@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { PostImageCarousel } from '@/components/aspan/post-image-carousel'
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -12,6 +13,7 @@ function formatDate(date: Date) {
 export type FeedPostData = {
   id: number
   imageUrl: string
+  imageUrls?: unknown
   caption: string
   createdAt: Date | string
 }
@@ -19,6 +21,9 @@ export type FeedPostData = {
 export function FeedPost({ post }: { post: FeedPostData }) {
   const created =
     typeof post.createdAt === 'string' ? new Date(post.createdAt) : post.createdAt
+  const images = Array.isArray(post.imageUrls)
+    ? post.imageUrls.filter((image): image is string => typeof image === 'string')
+    : [post.imageUrl].filter(Boolean)
 
   return (
     <article className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
@@ -40,15 +45,11 @@ export function FeedPost({ post }: { post: FeedPostData }) {
         </div>
       </header>
 
-      <div className="relative aspect-square w-full bg-muted">
-        <Image
-          src={post.imageUrl || '/placeholder.svg'}
-          alt={post.caption || 'Atualização da ASPAN'}
-          fill
-          sizes="(max-width: 640px) 100vw, 600px"
-          className="object-cover"
-        />
-      </div>
+      <PostImageCarousel
+        alt={post.caption || 'Atualizacao da ASPAN'}
+        images={images}
+        sizes="(max-width: 640px) 100vw, 600px"
+      />
 
       {post.caption && (
         <div className="px-4 py-4">

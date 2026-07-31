@@ -70,6 +70,7 @@ export const posts = pgTable('posts', {
   id: serial('id').primaryKey(),
   userId: text('userId').notNull(),
   imageUrl: text('imageUrl').notNull(),
+  imageUrls: jsonb('imageUrls'),
   caption: text('caption').notNull().default(''),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
 })

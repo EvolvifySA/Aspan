@@ -22,6 +22,7 @@ import {
 } from '@/app/actions/transparency'
 import { AspanLogo } from '@/components/aspan/logo'
 import type { FeedPostData } from '@/components/aspan/feed-post'
+import { PostImageCarousel } from '@/components/aspan/post-image-carousel'
 
 function formatDate(date: Date | string) {
   const d = typeof date === 'string' ? new Date(date) : date
@@ -43,6 +44,12 @@ function formatFileSize(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`
 }
 
+function getPostImages(post: FeedPostData) {
+  return Array.isArray(post.imageUrls)
+    ? post.imageUrls.filter((image): image is string => typeof image === 'string')
+    : [post.imageUrl].filter(Boolean)
+}
+
 export function AdminDashboard({
   posts,
   transparencyDocuments,
@@ -54,7 +61,7 @@ export function AdminDashboard({
 }) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [previews, setPreviews] = useState<string[]>([])
   const [caption, setCaption] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -66,15 +73,17 @@ export function AdminDashboard({
   const demoMode = userName === 'Modo demo'
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) {
-      setPreview(URL.createObjectURL(file))
+    previews.forEach((preview) => URL.revokeObjectURL(preview))
+    const files = Array.from(e.target.files ?? [])
+    if (files.length > 0) {
+      setPreviews(files.map((file) => URL.createObjectURL(file)))
       setError(null)
     }
   }
 
   function clearForm() {
-    setPreview(null)
+    previews.forEach((preview) => URL.revokeObjectURL(preview))
+    setPreviews([])
     setCaption('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -83,9 +92,11 @@ export function AdminDashboard({
     e.preventDefault()
     setError(null)
     const formData = new FormData(e.currentTarget)
-    const file = formData.get('image') as File | null
-    if (!file || file.size === 0) {
-      setError('Selecione uma imagem para publicar.')
+    const files = formData
+      .getAll('images')
+      .filter((value): value is File => value instanceof File && value.size > 0)
+    if (files.length === 0) {
+      setError('Selecione pelo menos uma imagem para publicar.')
       return
     }
     setUploading(true)
@@ -212,20 +223,35 @@ export function AdminDashboard({
               <input
                 ref={fileInputRef}
                 type="file"
-                name="image"
+                name="images"
                 accept="image/*"
+                multiple
                 onChange={handleFileChange}
                 className="sr-only"
                 id="image-input"
               />
-              {preview ? (
+              {previews.length > 0 ? (
                 <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-border">
-                  <Image
-                    src={preview || '/placeholder.svg'}
-                    alt="Pré-visualização"
-                    fill
-                    className="object-cover"
-                  />
+                  <div className={previews.length === 1 ? 'h-full w-full bg-muted p-1' : 'grid h-full w-full grid-cols-2 gap-1 bg-muted p-1'}>
+                    {previews.slice(0, 4).map((preview, index) => (
+                      <div key={preview} className="relative overflow-hidden rounded-xl bg-background">
+                        <Image
+                          src={preview}
+                          alt={`Pre-visualizacao ${index + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+                        {index === 3 && previews.length > 4 ? (
+                          <span className="absolute inset-0 flex items-center justify-center bg-foreground/60 text-lg font-bold text-background">
+                            +{previews.length - 4}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                  <span className="absolute bottom-2 left-2 rounded-full bg-background/90 px-3 py-1 text-xs font-semibold text-foreground shadow-md">
+                    {previews.length} foto{previews.length > 1 ? 's' : ''}
+                  </span>
                   <button
                     type="button"
                     onClick={clearForm}
@@ -242,7 +268,7 @@ export function AdminDashboard({
                 >
                   <Upload className="h-7 w-7 text-muted-foreground" />
                   <span className="px-4 text-sm font-medium text-muted-foreground">
-                    Selecionar foto
+                    Selecionar fotos
                   </span>
                 </label>
               )}
@@ -429,13 +455,11 @@ export function AdminDashboard({
                   key={post.id}
                   className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                 >
-                  <div className="relative aspect-square w-full bg-muted">
-                    <Image
-                      src={post.imageUrl || '/placeholder.svg'}
-                      alt={post.caption || 'Publicação'}
-                      fill
+                  <div className="relative">
+                    <PostImageCarousel
+                      alt={post.caption || 'Publicacao'}
+                      images={getPostImages(post)}
                       sizes="(max-width: 640px) 100vw, 320px"
-                      className="object-cover"
                     />
                     <button
                       onClick={() => handleDelete(post.id)}
