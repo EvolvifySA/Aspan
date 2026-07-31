@@ -109,6 +109,37 @@ function optionalEnumSchema(options) {
   }, z.enum(options).optional().nullable());
 }
 
+function requiredTextSchema(message) {
+  return z.string({ required_error: message }).trim().min(1, message);
+}
+
+function requiredBooleanSchema(message) {
+  return z.boolean({
+    required_error: message,
+    invalid_type_error: message,
+  });
+}
+
+function requiredEnumSchema(options, message) {
+  return z.enum(options, {
+    required_error: message,
+    invalid_type_error: message,
+  });
+}
+
+function formatBrazilCellPhone(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!/^\d{2}9\d{8}$/.test(digits)) return null;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+const cellPhoneSchema = z
+  .string({ required_error: "Informe um telefone celular para contato." })
+  .transform((value) => formatBrazilCellPhone(value))
+  .refine(Boolean, {
+    message: "Informe um celular valido com DDD, no formato (DD) 9XXXX-XXXX.",
+  });
+
 function createFunctionalAssessmentSchema(fields) {
   return z.object(
     Object.fromEntries(
@@ -122,32 +153,44 @@ const aivdSchema = createFunctionalAssessmentSchema(AIVD_FIELDS);
 
 const solicitacaoCreateSchema = z
   .object({
-    nome_solicitante: z.string().trim().min(1),
-    email_solicitante: z.string().trim().email(),
-    grau_parentesco: z.enum(GRAU_PARENTESCO_OPTIONS),
+    nome_solicitante: requiredTextSchema("Informe o nome completo do solicitante."),
+    email_solicitante: z
+      .string({ required_error: "Informe o e-mail do solicitante." })
+      .trim()
+      .email("Informe um e-mail valido."),
+    grau_parentesco: requiredEnumSchema(GRAU_PARENTESCO_OPTIONS, "Informe o grau de parentesco."),
     grau_parentesco_outro: optionalTextSchema(),
-    endereco: z.string().trim().min(1),
-    cidade: z.string().trim().min(1),
-    estado: z.string().trim().min(1),
-    telefone_contato: z.string().trim().min(1),
-    nome_idoso: z.string().trim().min(1),
-    idade_idoso: z.coerce.number().int().positive(),
-    genero_idoso: optionalEnumSchema(GENERO_IDOSO_OPTIONS),
-    estado_conjugal: optionalEnumSchema(ESTADO_CONJUGAL_OPTIONS),
-    doencas: z.array(z.enum(DOENCAS_OPTIONS)).default([]),
+    endereco: requiredTextSchema("Informe endereco, numero e bairro."),
+    cidade: requiredTextSchema("Informe a cidade."),
+    estado: z
+      .string({ required_error: "Selecione o estado." })
+      .trim()
+      .length(2, "Selecione uma UF valida.")
+      .transform((value) => value.toUpperCase()),
+    telefone_contato: cellPhoneSchema,
+    nome_idoso: requiredTextSchema("Informe o nome completo do(a) idoso(a)."),
+    idade_idoso: z.coerce
+      .number({ required_error: "Informe a idade do(a) idoso(a)." })
+      .int("Informe uma idade valida.")
+      .positive("Informe uma idade valida."),
+    genero_idoso: requiredEnumSchema(GENERO_IDOSO_OPTIONS, "Selecione o genero do(a) idoso(a)."),
+    estado_conjugal: requiredEnumSchema(ESTADO_CONJUGAL_OPTIONS, "Selecione o estado conjugal."),
+    doencas: z.array(z.enum(DOENCAS_OPTIONS)).min(1, "Selecione pelo menos uma doenca."),
     doenca_outro: optionalTextSchema(),
     nivel_orientacao: optionalEnumSchema(NIVEL_ORIENTACAO_OPTIONS),
-    mobilidade: z.enum(MOBILIDADE_OPTIONS),
+    mobilidade: requiredEnumSchema(MOBILIDADE_OPTIONS, "Informe a mobilidade do(a) idoso(a)."),
     avaliacao_abvd: abvdSchema,
     avaliacao_aivd: aivdSchema,
-    medicacoes: z.string().trim().min(1),
-    interdicao: z.boolean().default(false),
-    procuracao: z.boolean().default(false),
-    familiares: optionalTextSchema(),
-    fonte_renda: optionalEnumSchema(FONTE_RENDA_OPTIONS),
-    renda_mensal_faixa: z.enum(RENDA_MENSAL_OPTIONS),
+    medicacoes: optionalTextSchema(),
+    interdicao: requiredBooleanSchema("Informe se o(a) idoso(a) e interditado(a)."),
+    procuracao: requiredBooleanSchema("Informe se ha procuracao para o representante legal."),
+    familiares: requiredTextSchema("Informe os familiares do(a) idoso(a)."),
+    fonte_renda: requiredEnumSchema(FONTE_RENDA_OPTIONS, "Selecione a fonte de renda."),
+    renda_mensal_faixa: requiredEnumSchema(RENDA_MENSAL_OPTIONS, "Selecione a renda mensal."),
     renda_mensal_outro: optionalTextSchema(),
-    historico_lar: z.boolean().default(false),
+    historico_lar: requiredBooleanSchema(
+      "Informe se o(a) idoso(a) ja morou em lar de longa permanencia.",
+    ),
     detalhes_historico_lar: optionalTextSchema(),
     observacao: optionalTextSchema(),
   })
@@ -182,6 +225,14 @@ const solicitacaoCreateSchema = z
         path: ["nivel_orientacao"],
         message:
           "Nivel de orientacao e obrigatorio quando Demencia ou Alzheimer estiver marcado.",
+      });
+    }
+
+    if (value.historico_lar === true && !value.detalhes_historico_lar) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["detalhes_historico_lar"],
+        message: "Informe em qual lar o(a) idoso(a) morou e por que saiu.",
       });
     }
   });
@@ -345,7 +396,7 @@ app.post(
           data.mobilidade,
           JSON.stringify(data.avaliacao_abvd),
           JSON.stringify(data.avaliacao_aivd),
-          data.medicacoes,
+          normalizeOptionalString(data.medicacoes) ?? "",
           data.interdicao,
           data.procuracao,
           normalizeOptionalString(data.familiares),
@@ -431,8 +482,9 @@ app.delete(
 
 app.use((error, req, res, next) => {
   if (error instanceof z.ZodError) {
+    const firstIssue = error.issues[0];
     return res.status(400).json({
-      message: "Validation failed",
+      message: firstIssue?.message || "Revise os campos obrigatorios.",
       issues: error.issues,
     });
   }

@@ -52,6 +52,23 @@ CREATE TABLE IF NOT EXISTS "posts" (
   "createdAt" timestamp NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS "transparency_documents" (
+  "id" serial PRIMARY KEY,
+  "title" text NOT NULL,
+  "reference_month" text NOT NULL,
+  "file_url" text NOT NULL,
+  "original_filename" text NOT NULL,
+  "file_size" integer NOT NULL,
+  "uploaded_by" text NOT NULL,
+  "created_at" timestamp NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "transparency_documents_reference_month_idx"
+  ON "transparency_documents"("reference_month");
+
+CREATE INDEX IF NOT EXISTS "transparency_documents_created_at_idx"
+  ON "transparency_documents"("created_at");
+
 CREATE TABLE IF NOT EXISTS "solicitacoes_vaga" (
   "id" text PRIMARY KEY,
   "nome_solicitante" text NOT NULL,

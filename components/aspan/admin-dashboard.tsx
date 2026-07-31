@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   ClipboardList,
+  FileText,
   ImagePlus,
   Loader2,
   LogOut,
@@ -14,6 +15,11 @@ import {
 } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { createPost, deletePost } from '@/app/actions/posts'
+import {
+  deleteTransparencyDocument,
+  uploadTransparencyDocument,
+  type TransparencyDocumentData,
+} from '@/app/actions/transparency'
 import { AspanLogo } from '@/components/aspan/logo'
 import type { FeedPostData } from '@/components/aspan/feed-post'
 
@@ -27,11 +33,23 @@ function formatDate(date: Date | string) {
   }).format(d)
 }
 
+function formatReferenceMonth(value: string) {
+  const [year, month] = value.split('-')
+  return month && year ? `${month}/${year}` : value
+}
+
+function formatFileSize(value: number) {
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`
+  return `${(value / 1024 / 1024).toFixed(1)} MB`
+}
+
 export function AdminDashboard({
   posts,
+  transparencyDocuments,
   userName,
 }: {
   posts: FeedPostData[]
+  transparencyDocuments: TransparencyDocumentData[]
   userName: string
 }) {
   const router = useRouter()
@@ -41,6 +59,9 @@ export function AdminDashboard({
   const [error, setError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const [pdfUploading, setPdfUploading] = useState(false)
+  const [deletingTransparencyId, setDeletingTransparencyId] = useState<number | null>(null)
   const [, startTransition] = useTransition()
   const demoMode = userName === 'Modo demo'
 
@@ -87,6 +108,42 @@ export function AdminDashboard({
         router.refresh()
       } finally {
         setDeletingId(null)
+      }
+    })
+  }
+
+  async function handleTransparencySubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setPdfError(null)
+    const form = e.currentTarget
+    const formData = new FormData(form)
+    const file = formData.get('pdf') as File | null
+
+    if (!file || file.size === 0) {
+      setPdfError('Selecione um arquivo PDF.')
+      return
+    }
+
+    setPdfUploading(true)
+    try {
+      await uploadTransparencyDocument(formData)
+      form.reset()
+      router.refresh()
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : 'Falha ao enviar PDF.')
+    } finally {
+      setPdfUploading(false)
+    }
+  }
+
+  function handleTransparencyDelete(id: number) {
+    setDeletingTransparencyId(id)
+    startTransition(async () => {
+      try {
+        await deleteTransparencyDocument(id)
+        router.refresh()
+      } finally {
+        setDeletingTransparencyId(null)
       }
     })
   }
@@ -237,6 +294,122 @@ export function AdminDashboard({
             </div>
           </div>
         </form>
+
+        <section className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 font-[family-name:var(--font-poppins)] text-lg font-bold">
+            <FileText className="h-5 w-5 text-accent" />
+            Transparência
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Envie os PDFs mensais que aparecem na seção pública de Transparência.
+          </p>
+
+          <form onSubmit={handleTransparencySubmit} className="mt-5 grid gap-4 md:grid-cols-[1fr_180px]">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="transparency-pdf" className="text-sm font-medium text-foreground">
+                  PDF
+                </label>
+                <input
+                  id="transparency-pdf"
+                  name="pdf"
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  required
+                  className="rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground file:mr-4 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-semibold file:text-accent-foreground"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="referenceMonth" className="text-sm font-medium text-foreground">
+                  Mês de referência
+                </label>
+                <input
+                  id="referenceMonth"
+                  name="referenceMonth"
+                  type="month"
+                  required
+                  className="rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <label htmlFor="transparency-title" className="text-sm font-medium text-foreground">
+                  Título
+                </label>
+                <input
+                  id="transparency-title"
+                  name="title"
+                  placeholder="Transparência - mês/ano"
+                  className="rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-end gap-3">
+              {pdfError && (
+                <p className="rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+                  {pdfError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={pdfUploading}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {pdfUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {pdfUploading ? 'Enviando...' : 'Enviar PDF'}
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-6 space-y-3">
+            {transparencyDocuments.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border bg-background px-5 py-8 text-center text-sm text-muted-foreground">
+                Nenhum PDF enviado ainda. A seção pública usará o arquivo padrão.
+              </p>
+            ) : (
+              transparencyDocuments.map((document) => (
+                <div
+                  key={document.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-semibold text-foreground">{document.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatReferenceMonth(document.referenceMonth)} · {formatFileSize(document.fileSize)} · {document.uploadedBy}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={document.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+                    >
+                      Abrir
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleTransparencyDelete(document.id)}
+                      disabled={deletingTransparencyId === document.id}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-destructive transition-colors hover:bg-destructive hover:text-background disabled:opacity-60"
+                      aria-label="Remover PDF"
+                    >
+                      {deletingTransparencyId === document.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         {/* Lista de publicações */}
         <div className="mt-10">

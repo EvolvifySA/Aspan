@@ -82,7 +82,7 @@ export function Hero() {
         <Reveal delay={200} className="relative">
           <div className="animate-float-slow relative overflow-hidden rounded-[2.5rem] border border-border shadow-2xl shadow-accent/15">
             <Image
-              src="/images/galeria-11.webp"
+              src="/images/hero.jpg"
               alt="Cuidadora sorrindo e segurando as mãos de uma idosa em um lar acolhedor"
               width={720}
               height={820}

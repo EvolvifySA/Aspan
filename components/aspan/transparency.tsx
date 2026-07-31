@@ -1,7 +1,13 @@
 import { FileText, Download, ShieldCheck } from 'lucide-react'
 import { Reveal } from '@/components/reveal'
+import { getLatestTransparencyDocument } from '@/app/actions/transparency'
 
-export function Transparency() {
+const FALLBACK_TRANSPARENCY_PDF = 'https://www.aspan.com.br/assets/transparencia.pdf'
+
+export async function Transparency() {
+  const latestDocument = await getLatestTransparencyDocument()
+  const pdfUrl = latestDocument?.fileUrl ?? FALLBACK_TRANSPARENCY_PDF
+
   return (
     <section id="transparencia" className="px-4 py-16 md:py-24">
       <div className="mx-auto max-w-6xl">
@@ -50,7 +56,7 @@ export function Transparency() {
                   Acesse o PDF com todos os detalhes dos repasses e projetos.
                 </p>
                 <a
-                  href="https://www.aspan.com.br/assets/transparencia.pdf"
+                  href={pdfUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-accent px-6 py-3.5 text-base font-semibold text-accent-foreground shadow-lg shadow-accent/25 transition-all hover:scale-[1.02]"

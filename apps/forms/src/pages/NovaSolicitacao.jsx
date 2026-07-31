@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ClipboardList, Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,58 @@ import {
   RENDA_MENSAL_OPTIONS,
 } from "../../shared/solicitacao.js";
 import { solicitacaoApi } from "@/lib/api";
+
+const EMAIL_DOMAINS = [
+  "gmail.com",
+  "icloud.com",
+  "hotmail.com",
+  "outlook.com",
+  "yahoo.com",
+  "yahoo.com.br",
+  "uol.com.br",
+  "bol.com.br",
+];
+
+const FALLBACK_UFS = [
+  { id: 12, sigla: "AC", nome: "Acre" },
+  { id: 27, sigla: "AL", nome: "Alagoas" },
+  { id: 16, sigla: "AP", nome: "Amapa" },
+  { id: 13, sigla: "AM", nome: "Amazonas" },
+  { id: 29, sigla: "BA", nome: "Bahia" },
+  { id: 23, sigla: "CE", nome: "Ceara" },
+  { id: 53, sigla: "DF", nome: "Distrito Federal" },
+  { id: 32, sigla: "ES", nome: "Espirito Santo" },
+  { id: 52, sigla: "GO", nome: "Goias" },
+  { id: 21, sigla: "MA", nome: "Maranhao" },
+  { id: 51, sigla: "MT", nome: "Mato Grosso" },
+  { id: 50, sigla: "MS", nome: "Mato Grosso do Sul" },
+  { id: 31, sigla: "MG", nome: "Minas Gerais" },
+  { id: 15, sigla: "PA", nome: "Para" },
+  { id: 25, sigla: "PB", nome: "Paraiba" },
+  { id: 41, sigla: "PR", nome: "Parana" },
+  { id: 26, sigla: "PE", nome: "Pernambuco" },
+  { id: 22, sigla: "PI", nome: "Piaui" },
+  { id: 33, sigla: "RJ", nome: "Rio de Janeiro" },
+  { id: 24, sigla: "RN", nome: "Rio Grande do Norte" },
+  { id: 43, sigla: "RS", nome: "Rio Grande do Sul" },
+  { id: 11, sigla: "RO", nome: "Rondonia" },
+  { id: 14, sigla: "RR", nome: "Roraima" },
+  { id: 42, sigla: "SC", nome: "Santa Catarina" },
+  { id: 35, sigla: "SP", nome: "Sao Paulo" },
+  { id: 28, sigla: "SE", nome: "Sergipe" },
+  { id: 17, sigla: "TO", nome: "Tocantins" },
+];
+
+function maskCellPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function isValidCellPhone(value) {
+  return /^\d{2}9\d{8}$/.test(String(value || "").replace(/\D/g, ""));
+}
 
 function Section({ title, description, children, accent = "#3a5dab" }) {
   return (
@@ -68,10 +120,15 @@ function SelectInput({ value, onChange, options, placeholder = "Selecione", requ
 function BooleanSelect({ value, onChange }) {
   return (
     <select
-      value={value ? "Sim" : "Nao"}
-      onChange={(event) => onChange(event.target.value === "Sim")}
+      value={value === true ? "Sim" : value === false ? "Nao" : ""}
+      onChange={(event) => {
+        if (!event.target.value) onChange("");
+        else onChange(event.target.value === "Sim");
+      }}
+      required
       className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-500"
     >
+      <option value="">Selecione</option>
       <option value="Nao">Nao</option>
       <option value="Sim">Sim</option>
     </select>
@@ -103,14 +160,89 @@ export default function NovaSolicitacao() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ufs, setUfs] = useState(FALLBACK_UFS);
+  const [cidades, setCidades] = useState([]);
+  const [isIbgeFallback, setIsIbgeFallback] = useState(false);
+  const [isLoadingCidades, setIsLoadingCidades] = useState(false);
 
   const grauPrevisto = useMemo(() => calcularGrauClassificacao(form), [form]);
   const situacaoPrevista = defaultSituacaoFromGrau(grauPrevisto);
   const precisaOrientacao = hasDemenciaOuAlzheimer(form);
   const usaDoencaOutro = form.doencas.includes("Outro");
+  const emailSuggestions = useMemo(() => {
+    const [name, domain = ""] = form.email_solicitante.split("@");
+    if (!form.email_solicitante.includes("@") || !name.trim()) return [];
+    return EMAIL_DOMAINS.filter((item) => item.startsWith(domain.toLowerCase())).map(
+      (item) => `${name}@${item}`,
+    );
+  }, [form.email_solicitante]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadUfs() {
+      try {
+        const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
+        if (!response.ok) throw new Error("IBGE indisponivel");
+        const data = await response.json();
+        if (isActive) {
+          setUfs(data.map((item) => ({ id: item.id, sigla: item.sigla, nome: item.nome })));
+          setIsIbgeFallback(false);
+        }
+      } catch {
+        if (isActive) {
+          setUfs(FALLBACK_UFS);
+          setIsIbgeFallback(true);
+        }
+      }
+    }
+
+    loadUfs();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const selectedUf = ufs.find((uf) => uf.sigla === form.estado);
+
+    async function loadCidades() {
+      if (!selectedUf || isIbgeFallback) {
+        setCidades([]);
+        return;
+      }
+
+      setIsLoadingCidades(true);
+      try {
+        const response = await fetch(
+          `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedUf.id}/municipios?orderBy=nome`,
+        );
+        if (!response.ok) throw new Error("IBGE indisponivel");
+        const data = await response.json();
+        if (isActive) setCidades(data.map((item) => item.nome));
+      } catch {
+        if (isActive) {
+          setCidades([]);
+          setIsIbgeFallback(true);
+        }
+      } finally {
+        if (isActive) setIsLoadingCidades(false);
+      }
+    }
+
+    loadCidades();
+    return () => {
+      isActive = false;
+    };
+  }, [form.estado, isIbgeFallback, ufs]);
 
   const setValue = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const setEstado = (value) => {
+    setForm((current) => ({ ...current, estado: value, cidade: "" }));
   };
 
   const setFunctionalValue = (property, key, value) => {
@@ -121,6 +253,78 @@ export default function NovaSolicitacao() {
         [key]: value,
       },
     }));
+  };
+
+  const validateBeforeSubmit = () => {
+    const requiredTextFields = [
+      ["nome_solicitante", "Informe o nome completo do solicitante."],
+      ["email_solicitante", "Informe o e-mail do solicitante."],
+      ["grau_parentesco", "Informe o grau de parentesco."],
+      ["endereco", "Informe endereco, numero e bairro."],
+      ["estado", "Selecione o estado."],
+      ["cidade", "Informe a cidade."],
+      ["telefone_contato", "Informe um telefone celular para contato."],
+      ["nome_idoso", "Informe o nome completo do(a) idoso(a)."],
+      ["idade_idoso", "Informe a idade do(a) idoso(a)."],
+      ["genero_idoso", "Selecione o genero do(a) idoso(a)."],
+      ["estado_conjugal", "Selecione o estado conjugal."],
+      ["mobilidade", "Informe a mobilidade do(a) idoso(a)."],
+      ["familiares", "Informe os familiares do(a) idoso(a)."],
+      ["fonte_renda", "Selecione a fonte de renda."],
+      ["renda_mensal_faixa", "Selecione a renda mensal."],
+    ];
+
+    for (const [key, label] of requiredTextFields) {
+      if (!String(form[key] ?? "").trim()) return label;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email_solicitante)) {
+      return "Informe um e-mail valido.";
+    }
+
+    if (!isValidCellPhone(form.telefone_contato)) {
+      return "Informe um celular valido com DDD, no formato (DD) 9XXXX-XXXX.";
+    }
+
+    if (Number(form.idade_idoso) <= 0) {
+      return "Informe uma idade valida para o(a) idoso(a).";
+    }
+
+    if (form.doencas.length === 0) {
+      return "Selecione pelo menos uma doenca.";
+    }
+
+    if (form.grau_parentesco === "Outros" && !form.grau_parentesco_outro.trim()) {
+      return "Informe o grau de parentesco quando selecionar Outros.";
+    }
+
+    if (usaDoencaOutro && !form.doenca_outro.trim()) {
+      return "Informe qual doenca quando selecionar Outro.";
+    }
+
+    if (precisaOrientacao && !form.nivel_orientacao) {
+      return "Informe o nivel de orientacao quando Demencia ou Alzheimer estiver marcado.";
+    }
+
+    if (form.renda_mensal_faixa === "Outro" && !form.renda_mensal_outro.trim()) {
+      return "Informe a renda mensal quando selecionar Outro.";
+    }
+
+    if (form.historico_lar === true && !form.detalhes_historico_lar.trim()) {
+      return "Informe em qual lar o(a) idoso(a) morou e por que saiu.";
+    }
+
+    if (form.interdicao === "" || form.procuracao === "" || form.historico_lar === "") {
+      return "Responda todos os campos de Sim/Nao.";
+    }
+
+    const missingAbvd = ABVD_FIELDS.some((field) => !form.avaliacao_abvd[field.key]);
+    const missingAivd = AIVD_FIELDS.some((field) => !form.avaliacao_aivd[field.key]);
+    if (missingAbvd || missingAivd) {
+      return "Preencha todos os campos de funcionalidade ABVD e AIVD.";
+    }
+
+    return null;
   };
 
   const toggleDoenca = (doenca) => {
@@ -143,6 +347,14 @@ export default function NovaSolicitacao() {
     setIsSubmitting(true);
     setError(null);
     setMessage(null);
+
+    const validationMessage = validateBeforeSubmit();
+    if (validationMessage) {
+      setError(validationMessage);
+      setIsSubmitting(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     try {
       await solicitacaoApi.create(form);
@@ -210,7 +422,18 @@ export default function NovaSolicitacao() {
                 <Input value={form.nome_solicitante} onChange={(e) => setValue("nome_solicitante", e.target.value)} required />
               </Field>
               <Field label="E-mail do solicitante">
-                <Input type="email" value={form.email_solicitante} onChange={(e) => setValue("email_solicitante", e.target.value)} required />
+                <Input
+                  type="email"
+                  list="email-suggestions"
+                  value={form.email_solicitante}
+                  onChange={(e) => setValue("email_solicitante", e.target.value)}
+                  required
+                />
+                <datalist id="email-suggestions">
+                  {emailSuggestions.map((email) => (
+                    <option key={email} value={email} />
+                  ))}
+                </datalist>
               </Field>
               <Field label="Qual seu grau de parentesco com o(a) idoso(a)?">
                 <SelectInput value={form.grau_parentesco} onChange={(value) => setValue("grau_parentesco", value)} options={GRAU_PARENTESCO_OPTIONS} required />
@@ -225,12 +448,58 @@ export default function NovaSolicitacao() {
               </Field>
               <Field label="Cidade - Estado">
                 <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-                  <Input placeholder="Cidade" value={form.cidade} onChange={(e) => setValue("cidade", e.target.value)} required />
-                  <Input placeholder="Estado" value={form.estado} onChange={(e) => setValue("estado", e.target.value)} required />
+                  {isIbgeFallback ? (
+                    <Input
+                      placeholder="Cidade"
+                      value={form.cidade}
+                      onChange={(e) => setValue("cidade", e.target.value)}
+                      required
+                    />
+                  ) : (
+                    <select
+                      value={form.cidade}
+                      onChange={(event) => setValue("cidade", event.target.value)}
+                      required
+                      disabled={!form.estado || isLoadingCidades}
+                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-500 disabled:bg-slate-100"
+                    >
+                      <option value="">{isLoadingCidades ? "Carregando cidades..." : "Cidade"}</option>
+                      {cidades.map((cidade) => (
+                        <option key={cidade} value={cidade}>
+                          {cidade}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <select
+                    value={form.estado}
+                    onChange={(event) => setEstado(event.target.value)}
+                    required
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+                  >
+                    <option value="">UF</option>
+                    {ufs.map((uf) => (
+                      <option key={uf.sigla} value={uf.sigla}>
+                        {uf.sigla}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+                {isIbgeFallback ? (
+                  <p className="mt-2 text-xs text-amber-700">
+                    Lista de cidades indisponivel no momento. Informe a cidade manualmente.
+                  </p>
+                ) : null}
               </Field>
               <Field label="Telefone para contato">
-                <Input value={form.telefone_contato} onChange={(e) => setValue("telefone_contato", e.target.value)} required />
+                <Input
+                  inputMode="tel"
+                  maxLength={15}
+                  placeholder="(83) 98765-4321"
+                  value={form.telefone_contato}
+                  onChange={(e) => setValue("telefone_contato", maskCellPhone(e.target.value))}
+                  required
+                />
               </Field>
             </div>
           </Section>
@@ -248,10 +517,10 @@ export default function NovaSolicitacao() {
                 <Input type="number" min="0" value={form.idade_idoso} onChange={(e) => setValue("idade_idoso", e.target.value)} required />
               </Field>
               <Field label="Genero">
-                <SelectInput value={form.genero_idoso} onChange={(value) => setValue("genero_idoso", value)} options={GENERO_IDOSO_OPTIONS} />
+                <SelectInput value={form.genero_idoso} onChange={(value) => setValue("genero_idoso", value)} options={GENERO_IDOSO_OPTIONS} required />
               </Field>
               <Field label="Estado conjugal">
-                <SelectInput value={form.estado_conjugal} onChange={(value) => setValue("estado_conjugal", value)} options={ESTADO_CONJUGAL_OPTIONS} />
+                <SelectInput value={form.estado_conjugal} onChange={(value) => setValue("estado_conjugal", value)} options={ESTADO_CONJUGAL_OPTIONS} required />
               </Field>
             </div>
           </Section>
@@ -291,7 +560,7 @@ export default function NovaSolicitacao() {
                 <SelectInput value={form.mobilidade} onChange={(value) => setValue("mobilidade", value)} options={MOBILIDADE_OPTIONS} required />
               </Field>
               <Field label="Qual(is) medicacoes o(a) idoso(a) faz uso?">
-                <Textarea value={form.medicacoes} onChange={(e) => setValue("medicacoes", e.target.value)} rows={4} required />
+                <Textarea value={form.medicacoes} onChange={(e) => setValue("medicacoes", e.target.value)} rows={4} />
               </Field>
             </div>
           </Section>
@@ -320,10 +589,10 @@ export default function NovaSolicitacao() {
                 <BooleanSelect value={form.procuracao} onChange={(value) => setValue("procuracao", value)} />
               </Field>
               <Field label="Possui familiares? Quais?">
-                <Textarea value={form.familiares} onChange={(e) => setValue("familiares", e.target.value)} rows={4} />
+                <Textarea value={form.familiares} onChange={(e) => setValue("familiares", e.target.value)} rows={4} required />
               </Field>
               <Field label="Fonte de renda">
-                <SelectInput value={form.fonte_renda} onChange={(value) => setValue("fonte_renda", value)} options={FONTE_RENDA_OPTIONS} />
+                <SelectInput value={form.fonte_renda} onChange={(value) => setValue("fonte_renda", value)} options={FONTE_RENDA_OPTIONS} required />
               </Field>
               <Field label="Qual a sua ultima renda mensal?">
                 <SelectInput value={form.renda_mensal_faixa} onChange={(value) => setValue("renda_mensal_faixa", value)} options={RENDA_MENSAL_OPTIONS} required />

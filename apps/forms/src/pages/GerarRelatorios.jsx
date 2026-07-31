@@ -14,6 +14,14 @@ function getRecordDate(item) {
   return item.createdAt || item.created_date || item.data_alteracao || item.updatedAt;
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function formatDate(value) {
   if (!value) return "-";
   return format(new Date(value), "dd/MM/yyyy HH:mm", { locale: ptBR });
@@ -274,9 +282,9 @@ export default function GerarRelatorios() {
   const [filtroUsuario, setFiltroUsuario] = useState("");
 
   const filtradas = useMemo(() => {
-    const query = filtroUsuario.toLowerCase().trim();
+    const query = normalizeSearchText(filtroUsuario);
     if (!query) return solicitacoes;
-    return solicitacoes.filter((item) => item.usuario_alteracao?.toLowerCase().includes(query));
+    return solicitacoes.filter((item) => normalizeSearchText(item.usuario_alteracao).includes(query));
   }, [filtroUsuario, solicitacoes]);
 
   const gerarHtml = (item) => {
@@ -381,6 +389,7 @@ export default function GerarRelatorios() {
                       <div>
                         <p className="font-semibold text-slate-900">{item.nome_idoso}</p>
                         <p className="text-sm text-slate-600">{item.nome_solicitante}</p>
+                        <p className="text-xs text-slate-500">Responsavel: {item.usuario_alteracao || "-"}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => gerarHtml(item)} className="gap-2 bg-slate-900 text-white hover:bg-slate-800">

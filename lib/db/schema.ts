@@ -74,6 +74,17 @@ export const posts = pgTable('posts', {
   createdAt: timestamp('createdAt').notNull().defaultNow(),
 })
 
+export const transparencyDocuments = pgTable('transparency_documents', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  referenceMonth: text('reference_month').notNull(),
+  fileUrl: text('file_url').notNull(),
+  originalFilename: text('original_filename').notNull(),
+  fileSize: integer('file_size').notNull(),
+  uploadedBy: text('uploaded_by').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})
+
 export const solicitacoesVaga = pgTable('solicitacoes_vaga', {
   id: text('id').primaryKey(),
   nomeSolicitante: text('nome_solicitante').notNull(),
