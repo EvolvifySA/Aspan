@@ -3,8 +3,6 @@ services:
     image: postgres:16-alpine
     container_name: aspan-db
     restart: unless-stopped
-    ports:
-      - '5432:5432'
     environment:
       POSTGRES_USER: aspan
       POSTGRES_PASSWORD: aspan
@@ -40,11 +38,12 @@ services:
     container_name: aspan-site
     restart: unless-stopped
     ports:
-      - '3000:3000'
+      - '8080:3000'
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://aspan:aspan@db:5432/aspan
-      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-in-production}
       FORMS_INTERNAL_URL: http://forms:3001
     volumes:
