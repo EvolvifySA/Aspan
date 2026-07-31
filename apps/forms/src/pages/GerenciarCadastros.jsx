@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { solicitacaoApi } from "@/lib/api";
+import { legacyWarningLabel } from "@/lib/legacyWarnings";
 import { useSolicitacoes } from "@/hooks/useSolicitacoes";
 import { ABVD_FIELDS, AIVD_FIELDS } from "../../shared/solicitacao.js";
 
@@ -48,12 +49,21 @@ function getRecordDate(item) {
 
 function formatDate(value) {
   if (!value) return "Nao informado";
-  return format(new Date(value), "dd/MM/yyyy", { locale: ptBR });
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "Nao informado";
+  return format(date, "dd/MM/yyyy", { locale: ptBR });
 }
 
 function formatDateTime(value) {
   if (!value) return "Nao informado";
-  return format(new Date(value), "dd/MM/yyyy HH:mm", { locale: ptBR });
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "Nao informado";
+  return format(date, "dd/MM/yyyy HH:mm", { locale: ptBR });
+}
+
+function recordTime(item) {
+  const time = new Date(getRecordDate(item)).valueOf();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function getAgeLabel(item) {
@@ -97,6 +107,7 @@ export default function GerenciarCadastros() {
   const [grau, setGrau] = useState("all");
   const [origem, setOrigem] = useState("all");
   const [revisao, setRevisao] = useState("all");
+  const [ordem, setOrdem] = useState("recentes");
   const [detalheSelecionado, setDetalheSelecionado] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -120,8 +131,11 @@ export default function GerenciarCadastros() {
       const matchRevisao =
         revisao === "all" || String(Boolean(item.necessita_revisao)) === revisao;
       return matchBusca && matchSituacao && matchGrau && matchOrigem && matchRevisao;
+    }).sort((left, right) => {
+      const difference = recordTime(right) - recordTime(left);
+      return ordem === "recentes" ? difference : -difference;
     });
-  }, [busca, grau, origem, revisao, situacao, solicitacoes]);
+  }, [busca, grau, ordem, origem, revisao, situacao, solicitacoes]);
 
   const exportarCsv = () => {
     const rows = filtradas.map((item) => ({
@@ -153,7 +167,7 @@ export default function GerenciarCadastros() {
       Grau: item.grau_classificacao,
       Origem: item.origem === "formulario_atual" ? "Formulario atual" : "Legado",
       "Necessita revisao": item.necessita_revisao ? "Sim" : "Nao",
-      Data: formatDate(getRecordDate(item)),
+      "Recebido em": formatDate(getRecordDate(item)),
       "Ultima alteracao": item.usuario_alteracao || "-",
     }));
 
@@ -198,11 +212,11 @@ export default function GerenciarCadastros() {
   const admitidos = solicitacoes.filter((item) => item.situacao === "Admissao").length;
   const grau3 = solicitacoes.filter((item) => item.grau_classificacao === 3).length;
 
-  const destaque = solicitacoes[0];
+  const destaque = filtradas[0] || solicitacoes[0];
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-none space-y-6">
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
           <div className="grid gap-0 md:grid-cols-[1.3fr_0.9fr]">
             <div className="bg-gradient-to-br from-[#0f172a] via-[#18233a] to-[#3a5dab] p-6 text-white md:p-8">
@@ -295,7 +309,7 @@ export default function GerenciarCadastros() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid gap-4 md:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
               <div className="space-y-2">
                 <Label>Busca geral</Label>
                 <div className="relative">
@@ -364,26 +378,79 @@ export default function GerenciarCadastros() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Ordem</Label>
+                <Select value={ordem} onValueChange={setOrdem}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recentes">Mais recentes primeiro</SelectItem>
+                    <SelectItem value="antigas">Mais antigas primeiro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-0 shadow-xl">
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="grid gap-3 p-3 lg:grid-cols-2 2xl:hidden">
+              {isLoading ? (
+                <p className="py-12 text-center text-slate-500 lg:col-span-2">Carregando registros...</p>
+              ) : error ? (
+                <p className="py-12 text-center text-red-600 lg:col-span-2">{error.message || "Erro ao carregar registros"}</p>
+              ) : filtradas.length === 0 ? (
+                <p className="py-12 text-center text-slate-500 lg:col-span-2">Nenhum cadastro encontrado</p>
+              ) : filtradas.map((item) => (
+                <article key={item.id} className="border border-slate-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold text-slate-900">{item.nome_idoso || "Nao informado"}</p>
+                      <p className="break-words text-sm text-slate-600">{item.nome_solicitante || "Nao informado"}</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {item.origem !== "formulario_atual" && <Badge variant="outline">Legado</Badge>}
+                        {item.necessita_revisao && <Badge className="bg-amber-100 text-amber-800">Revisao</Badge>}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`${situacaoColors[item.situacao] || "bg-slate-100 text-slate-700"} w-fit border`}>
+                      {item.situacao}
+                    </Badge>
+                  </div>
+
+                  <dl className="mt-4 grid gap-x-4 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div><dt className="text-xs text-slate-500">Recebido em</dt><dd className="font-medium text-slate-800">{formatDate(getRecordDate(item))}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Telefone</dt><dd className="break-words font-medium text-slate-800">{item.telefone_contato || "Nao informado"}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Cidade</dt><dd className="break-words font-medium text-slate-800">{item.cidade || "Nao informado"}</dd></div>
+                    <div><dt className="text-xs text-slate-500">Grau</dt><dd className="font-medium text-slate-800">{item.grau_classificacao ? `Grau ${item.grau_classificacao}` : "Sem classificacao"}</dd></div>
+                    <div className="sm:col-span-2 lg:col-span-4"><dt className="text-xs text-slate-500">Observacao</dt><dd className="break-words text-slate-700">{item.observacao || "Nao informado"}</dd></div>
+                  </dl>
+
+                  <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:justify-end">
+                    <Button size="sm" onClick={() => setDetalheSelecionado(item)} className="gap-2 bg-slate-900 text-white hover:bg-slate-800">
+                      <Eye className="h-4 w-4" /> Detalhes
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => confirmarExclusao(item)} disabled={isDeleting} className="gap-2">
+                      <Trash2 className="h-4 w-4" /> Apagar
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden 2xl:block">
+              <Table className="min-w-[1180px] table-fixed">
                 <TableHeader>
                   <TableRow className="bg-slate-50">
-                    <TableHead>Nome do idoso</TableHead>
-                    <TableHead>Solicitante</TableHead>
-                    <TableHead>Parentesco</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Cidade</TableHead>
-                    <TableHead>Atualizado</TableHead>
-                    <TableHead>Grau</TableHead>
-                    <TableHead>Situacao</TableHead>
+                    <TableHead className="w-[145px]">Nome do idoso</TableHead>
+                    <TableHead className="w-[155px]">Solicitante</TableHead>
+                    <TableHead className="w-[90px]">Parentesco</TableHead>
+                    <TableHead className="w-[115px]">Telefone</TableHead>
+                    <TableHead className="w-[100px]">Cidade</TableHead>
+                    <TableHead className="w-[92px]">Recebido</TableHead>
+                    <TableHead className="w-[88px]">Grau</TableHead>
+                    <TableHead className="w-[115px]">Situacao</TableHead>
                     <TableHead>Observacao</TableHead>
-                    <TableHead>Acoes</TableHead>
+                    <TableHead className="sticky right-0 w-[104px] border-l bg-slate-50 text-center">Acoes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -434,25 +501,27 @@ export default function GerenciarCadastros() {
                         <TableCell className="max-w-xs truncate text-slate-600">
                           {item.observacao || "Nao informado"}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap items-center gap-2">
+                        <TableCell className="sticky right-0 border-l bg-white">
+                          <div className="flex items-center justify-center gap-2">
                             <Button
-                              size="sm"
+                              size="icon"
+                              title="Ver detalhes"
+                              aria-label="Ver detalhes"
                               onClick={() => setDetalheSelecionado(item)}
-                              className="gap-2 bg-slate-900 text-white hover:bg-slate-800"
+                              className="h-8 w-8 bg-slate-900 text-white hover:bg-slate-800"
                             >
                               <Eye className="h-4 w-4" />
-                              Detalhes
                             </Button>
                             <Button
                               variant="destructive"
-                              size="sm"
+                              size="icon"
+                              title="Apagar cadastro"
+                              aria-label="Apagar cadastro"
                               onClick={() => confirmarExclusao(item)}
                               disabled={isDeleting}
-                              className="gap-2"
+                              className="h-8 w-8"
                             >
                               <Trash2 className="h-4 w-4" />
-                              Apagar
                             </Button>
                           </div>
                         </TableCell>
@@ -503,7 +572,10 @@ export default function GerenciarCadastros() {
                     <div className="text-sm text-slate-600">E-mail: {detalheSelecionado.email_solicitante || "Nao informado"}</div>
                     <div className="flex items-center gap-3 text-sm text-slate-600">
                       <Clock3 className="h-4 w-4" />
-                      Atualizado em {formatDateTime(detalheSelecionado.updatedAt || detalheSelecionado.data_alteracao || detalheSelecionado.createdAt)}
+                      Recebido em {formatDateTime(detalheSelecionado.createdAt)}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      Ultima alteracao: {formatDateTime(detalheSelecionado.updatedAt || detalheSelecionado.data_alteracao)}
                     </div>
                   </CardContent>
                 </Card>
@@ -548,7 +620,7 @@ export default function GerenciarCadastros() {
                       <div className="md:col-span-2">
                         <p className="mb-2 text-sm font-semibold text-slate-700">Avisos da migracao</p>
                         <div className="flex flex-wrap gap-2">
-                          {detalheSelecionado.avisos_migracao.map((warning) => <Badge key={warning} variant="outline">{warning}</Badge>)}
+                          {detalheSelecionado.avisos_migracao.map((warning) => <Badge key={warning} variant="outline">{legacyWarningLabel(warning)}</Badge>)}
                         </div>
                       </div>
                     )}

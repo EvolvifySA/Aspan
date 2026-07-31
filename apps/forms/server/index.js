@@ -267,6 +267,8 @@ const legacyReviewSchema = z
     interdicao: nullableBooleanSchema,
     procuracao: nullableBooleanSchema,
     historico_lar: nullableBooleanSchema,
+    created_at: z.string().datetime().optional(),
+    avisos_migracao: z.array(z.string().trim().min(1).max(100)).max(100).optional(),
     revisao_concluida: z.boolean().optional(),
   })
   .strict();
@@ -347,7 +349,7 @@ app.get(
     const { rows } = await pool.query(
       `SELECT ${solicitacaoFields}
        FROM solicitacoes_vaga
-       ORDER BY created_at DESC`,
+       ORDER BY created_at DESC NULLS LAST, updated_at DESC, id DESC`,
     );
 
     return res.json(rows.map(serializeSolicitacao));
@@ -532,12 +534,13 @@ app.patch(
       "nome_solicitante", "email_solicitante", "telefone_contato", "nome_idoso",
       "idade_idoso", "cidade", "estado", "grau_classificacao", "situacao",
       "observacao", "interdicao", "procuracao", "historico_lar",
+      "created_at", "avisos_migracao",
     ];
     const assignments = [];
     const values = [req.params.id];
     for (const field of allowedFields) {
       if (!(field in data)) continue;
-      values.push(data[field]);
+      values.push(field === "avisos_migracao" ? JSON.stringify(data[field]) : data[field]);
       assignments.push(`${field} = $${values.length}`);
     }
 

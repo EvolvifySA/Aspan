@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileSearch, Loader2, Search } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, FileSearch, Loader2, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { solicitacaoApi } from "@/lib/api";
+import { legacyWarningLabel } from "@/lib/legacyWarnings";
 import { useSolicitacoes } from "@/hooks/useSolicitacoes";
 import { SITUACAO_OPTIONS } from "../../shared/solicitacao.js";
 
@@ -26,8 +27,17 @@ const emptyDraft = {
   procuracao: "unknown",
   historico_lar: "unknown",
   observacao: "",
+  created_at: "",
+  avisos_migracao: [],
   revisao_concluida: false,
 };
+
+function toDateTimeLocal(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "";
+  const localDate = new Date(date.valueOf() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
 
 function nullable(value) {
   const text = String(value ?? "").trim();
@@ -84,6 +94,8 @@ export default function RevisarMigracao() {
       procuracao: booleanDraft(item.procuracao),
       historico_lar: booleanDraft(item.historico_lar),
       observacao: item.observacao || "",
+      created_at: toDateTimeLocal(item.createdAt),
+      avisos_migracao: Array.isArray(item.avisos_migracao) ? item.avisos_migracao : [],
       revisao_concluida: !item.necessita_revisao,
     });
     try {
@@ -95,9 +107,25 @@ export default function RevisarMigracao() {
 
   const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
 
+  const updateReceivedAt = (value) => {
+    setDraft((current) => ({
+      ...current,
+      created_at: value,
+      avisos_migracao: current.avisos_migracao.filter(
+        (warning) => warning !== "data_envio_invalida",
+      ),
+    }));
+  };
+
   const save = async () => {
     setSaving(true);
     setSaveError("");
+    const receivedAt = new Date(draft.created_at);
+    if (!draft.created_at || Number.isNaN(receivedAt.valueOf())) {
+      setSaveError("Informe uma data de recebimento valida.");
+      setSaving(false);
+      return;
+    }
     try {
       await solicitacaoApi.review(selected.id, {
         nome_solicitante: nullable(draft.nome_solicitante),
@@ -113,6 +141,8 @@ export default function RevisarMigracao() {
         procuracao: booleanPayload(draft.procuracao),
         historico_lar: booleanPayload(draft.historico_lar),
         observacao: nullable(draft.observacao),
+        created_at: receivedAt.toISOString(),
+        avisos_migracao: draft.avisos_migracao,
         revisao_concluida: draft.revisao_concluida,
       });
       await refresh();
@@ -226,17 +256,63 @@ export default function RevisarMigracao() {
             {booleanSelect('Procuracao', 'procuracao')}
             {booleanSelect('Historico de ILPI', 'historico_lar')}
             <div className="space-y-2 md:col-span-2">
+              <Label>Data de recebimento</Label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  type="datetime-local"
+                  value={draft.created_at}
+                  onChange={(event) => updateReceivedAt(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 gap-2"
+                  onClick={() => updateReceivedAt(toDateTimeLocal(new Date()))}
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Usar data atual
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 md:col-span-2">
               <Label>Observacao</Label>
               <Textarea rows={5} value={draft.observacao} onChange={(event) => update('observacao', event.target.value)} />
             </div>
           </div>
 
           <div className="space-y-3 border-t border-slate-200 pt-4">
-            <p className="text-sm font-semibold text-slate-900">Avisos da importacao</p>
-            <div className="flex flex-wrap gap-2">{(selected?.avisos_migracao || []).map((warning) => <Badge key={warning} variant="outline">{warning}</Badge>)}</div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Avisos pendentes</p>
+              <p className="text-xs text-slate-500">Dispense avisos que foram conferidos. A auditoria original permanece intacta.</p>
+            </div>
+            {draft.avisos_migracao.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {draft.avisos_migracao.map((warning) => (
+                  <Badge key={warning} variant="outline" className="gap-1 border-amber-300 bg-amber-50 py-1 pl-2 pr-1 text-amber-900">
+                    {legacyWarningLabel(warning)}
+                    <button
+                      type="button"
+                      title="Dispensar aviso"
+                      aria-label={`Dispensar: ${legacyWarningLabel(warning)}`}
+                      className="ml-1 rounded p-0.5 hover:bg-amber-200"
+                      onClick={() => update("avisos_migracao", draft.avisos_migracao.filter((item) => item !== warning))}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-emerald-700">Todos os avisos foram conferidos.</p>
+            )}
             {legacy?.raw_data && (
               <details className="border border-slate-200 bg-slate-50 p-3">
                 <summary className="cursor-pointer text-sm font-semibold text-slate-700">Dados originais da linha</summary>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(legacy.warnings || []).map((warning) => (
+                    <Badge key={warning} variant="outline">{legacyWarningLabel(warning)}</Badge>
+                  ))}
+                </div>
                 <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-slate-600">{JSON.stringify(legacy.raw_data, null, 2)}</pre>
               </details>
             )}
@@ -251,7 +327,7 @@ export default function RevisarMigracao() {
               {saveError}
             </p>
           )}
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setSelected(null)}>Cancelar</Button>
             <Button onClick={save} disabled={saving} className="gap-2 bg-slate-900 text-white">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
