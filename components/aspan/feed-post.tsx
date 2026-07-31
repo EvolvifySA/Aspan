@@ -4,6 +4,7 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
     month: 'long',
+    timeZone: 'America/Sao_Paulo',
     year: 'numeric',
   }).format(date)
 }

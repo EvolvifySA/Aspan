@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   description:
     'A ASPAN cuida com amor e dignidade de idosos, oferecendo atendimento multiprofissional, atividades e convívio de qualidade. Ajude, doe e faça toda a diferença.',
   generator: 'v0.app',
+  manifest: '/manifest.json',
   icons: {
     icon: '/images/aspan-logo.webp',
     shortcut: '/images/aspan-logo.webp',
@@ -40,7 +41,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${poppins.variable} ${inter.variable}`}>
       <body className="bg-background font-sans antialiased">
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.VERCEL === '1' && <Analytics />}
       </body>
     </html>
   )
