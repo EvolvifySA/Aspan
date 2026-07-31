@@ -38,7 +38,7 @@ export function About() {
         <Reveal className="relative order-2 lg:order-1">
           <div className="overflow-hidden rounded-[2.5rem] border border-border shadow-2xl shadow-accent/15">
             <Image
-              src="/images/quem-somos.png"
+              src="/images/galeria-10.webp"
               alt="Grupo de idosos participando de uma atividade em grupo com uma enfermeira"
               width={700}
               height={560}

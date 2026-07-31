@@ -9,10 +9,14 @@ import { cn } from '@/lib/utils'
 // Adicione ou substitua as fotos manualmente aqui.
 // Coloque os arquivos em /public/images e informe o caminho em `src`.
 const photos = [
-  { src: '/images/instituicao-1.png', alt: 'Fachada da ASPAN' },
-  { src: '/images/instituicao-2.png', alt: 'Sala de convívio da ASPAN' },
-  { src: '/images/instituicao-3.png', alt: 'Refeitório da ASPAN' },
-  { src: '/images/instituicao-4.png', alt: 'Jardim da ASPAN' },
+  { src: '/images/galeria-15.webp', alt: 'Leitura em conjunto' },
+  { src: '/images/galeria12.webp', alt: 'Senhora feliz' },
+  { src: '/images/galeria4.jpg', alt: '' },
+  { src: '/images/galeria3.jpg', alt: '' },
+  { src: '/images/galeria5.jpg', alt: 'Dia de benção' },
+  { src: '/images/galeria6.jpg', alt: 'Conhecendo o aquário' },
+  { src: '/images/galeria7.jpg', alt: 'Torcendo pra copa' },
+  { src: '/images/galeria1.jpg', alt: 'Evento especial' },
 ]
 
 export function InstitutionCarousel() {

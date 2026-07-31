@@ -52,7 +52,7 @@ export function Hero() {
                 Quero doar
               </a>
               <a
-                href="#servicos"
+                href="/solicitacao-vaga"
                 className="group inline-flex items-center gap-2 rounded-full border border-border bg-secondary/50 px-6 py-3.5 text-base font-semibold text-foreground backdrop-blur transition-all hover:bg-secondary"
               >
                 Solicitar uma vaga
@@ -82,7 +82,7 @@ export function Hero() {
         <Reveal delay={200} className="relative">
           <div className="animate-float-slow relative overflow-hidden rounded-[2.5rem] border border-border shadow-2xl shadow-accent/15">
             <Image
-              src="/images/hero-idosos.png"
+              src="/images/galeria-11.webp"
               alt="Cuidadora sorrindo e segurando as mãos de uma idosa em um lar acolhedor"
               width={720}
               height={820}

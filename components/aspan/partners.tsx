@@ -1,19 +1,24 @@
 import Image from 'next/image'
-import { Building2, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Reveal } from '@/components/reveal'
 
-// Substitua os itens abaixo pelos logos reais das empresas parceiras.
-// Basta colocar a imagem em /public/images e informar o caminho em `logo`.
 const partners = [
-  { name: 'Parceiro 1', logo: '' },
-  { name: 'Parceiro 2', logo: '' },
-  { name: 'Parceiro 3', logo: '' },
-  { name: 'Parceiro 4', logo: '' },
-  { name: 'Parceiro 5', logo: '' },
-  { name: 'Parceiro 6', logo: '' },
-  { name: 'Parceiro 7', logo: '' },
-  { name: 'Parceiro 8', logo: '' },
-  { name: 'Parceiro 9', logo: '' },
+  { name: 'Cidade Viva', logo: '/images/cidadeviva.png' },
+  { name: 'CMDI', logo: '/images/CMDI.jpg' },
+  { name: 'CNTRL', logo: '/images/cntrl.png' },
+  { name: 'Consolacao', logo: '/images/consolacao.png' },
+  { name: 'Grau', logo: '/images/grau.webp' },
+  { name: 'IFPB', logo: '/images/ifpb.webp' },
+  { name: 'La Torre', logo: '/images/latorre-removebg-preview.png' },
+  { name: 'Arquidiocese', logo: '/images/logo-arquidiocese.png' },
+  { name: 'CACEPA', logo: '/images/logo-cacepa.webp' },
+  { name: 'Mesa Brasil', logo: '/images/mesabrasil.png' },
+  { name: 'Sicredi', logo: '/images/sicredi.webp' },
+  { name: 'Superbox', logo: '/images/superbox-removebg-preview.png' },
+  {
+    name: 'Supermercado Manaira',
+    logo: '/images/supermercadomanaira-removebg-preview.png',
+  },
 ]
 
 export function Partners() {
@@ -45,28 +50,19 @@ export function Partners() {
         </Reveal>
 
         <Reveal delay={120}>
-          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+          <div className="mx-auto grid max-w-md grid-cols-3 gap-3 sm:grid-cols-4 lg:justify-self-end">
             {partners.map((p) => (
               <div
                 key={p.name}
-                className="flex aspect-square items-center justify-center rounded-3xl border border-border bg-card/50 p-4 transition-all hover:border-accent/40 hover:bg-card"
+                className="flex aspect-square items-center justify-center rounded-2xl border border-border bg-card/50 p-3 transition-all hover:border-accent/40 hover:bg-card"
               >
-                {p.logo ? (
-                  <Image
-                    src={p.logo || '/placeholder.svg'}
-                    alt={p.name}
-                    width={120}
-                    height={120}
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Building2 className="h-7 w-7" />
-                    <span className="text-center text-[11px] font-medium leading-tight">
-                      {p.name}
-                    </span>
-                  </div>
-                )}
+                <Image
+                  src={p.logo}
+                  alt={p.name}
+                  width={110}
+                  height={110}
+                  className="h-full w-full object-contain"
+                />
               </div>
             ))}
           </div>

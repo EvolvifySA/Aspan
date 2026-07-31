@@ -51,3 +51,50 @@ CREATE TABLE IF NOT EXISTS "posts" (
   "caption" text NOT NULL DEFAULT '',
   "createdAt" timestamp NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS "solicitacoes_vaga" (
+  "id" text PRIMARY KEY,
+  "nome_solicitante" text NOT NULL,
+  "email_solicitante" text NOT NULL UNIQUE,
+  "grau_parentesco" text NOT NULL,
+  "grau_parentesco_outro" text,
+  "endereco" text NOT NULL,
+  "cidade" text NOT NULL,
+  "estado" text NOT NULL,
+  "telefone_contato" text NOT NULL,
+  "nome_idoso" text NOT NULL,
+  "idade_idoso" integer NOT NULL,
+  "genero_idoso" text,
+  "estado_conjugal" text,
+  "doencas" jsonb NOT NULL,
+  "doenca_outro" text,
+  "nivel_orientacao" text,
+  "mobilidade" text NOT NULL,
+  "avaliacao_abvd" jsonb NOT NULL,
+  "avaliacao_aivd" jsonb NOT NULL,
+  "medicacoes" text NOT NULL,
+  "interdicao" boolean NOT NULL DEFAULT false,
+  "procuracao" boolean NOT NULL DEFAULT false,
+  "familiares" text,
+  "fonte_renda" text,
+  "renda_mensal_faixa" text,
+  "renda_mensal_outro" text,
+  "historico_lar" boolean NOT NULL DEFAULT false,
+  "detalhes_historico_lar" text,
+  "grau_classificacao" integer NOT NULL,
+  "situacao" text NOT NULL DEFAULT 'Esperando atendimento',
+  "observacao" text,
+  "usuario_alteracao" text,
+  "data_alteracao" timestamp,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS "solicitacoes_vaga_situacao_idx"
+  ON "solicitacoes_vaga"("situacao");
+
+CREATE INDEX IF NOT EXISTS "solicitacoes_vaga_grau_classificacao_idx"
+  ON "solicitacoes_vaga"("grau_classificacao");
+
+CREATE INDEX IF NOT EXISTS "solicitacoes_vaga_created_at_idx"
+  ON "solicitacoes_vaga"("created_at");

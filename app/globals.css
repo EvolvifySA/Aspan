@@ -140,6 +140,44 @@
     animation: pulse-soft 5s ease-in-out infinite;
   }
 
+  @keyframes video-drop-open {
+    0% {
+      opacity: 0;
+      clip-path: inset(0 18% 88% 18% round 2rem);
+      transform: translateY(-28px) scale(0.94);
+    }
+    65% {
+      opacity: 1;
+      clip-path: inset(0 0 0 0 round 2rem);
+      transform: translateY(2px) scale(1);
+    }
+    100% {
+      opacity: 1;
+      clip-path: inset(0 0 0 0 round 2rem);
+      transform: translateY(0) scale(1);
+    }
+  }
+  .animate-video-drop-open {
+    animation: video-drop-open 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transform-origin: top center;
+    will-change: clip-path, opacity, transform;
+  }
+
+  @keyframes video-bridge {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) scaleY(0);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) scaleY(1);
+    }
+  }
+  .animate-video-bridge {
+    animation: video-bridge 0.28s ease-out both;
+    transform-origin: top center;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .reveal {
       opacity: 1;
@@ -147,7 +185,9 @@
       transition: none;
     }
     .animate-float-slow,
-    .animate-pulse-soft {
+    .animate-pulse-soft,
+    .animate-video-drop-open,
+    .animate-video-bridge {
       animation: none;
     }
   }

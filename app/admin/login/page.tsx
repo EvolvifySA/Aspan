@@ -8,9 +8,20 @@ import { AdminAuthForm } from '@/components/aspan/admin-auth-form'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AdminLoginPage() {
+function sanitizeRedirect(value: string | undefined) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/admin'
+  return value
+}
+
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ redirect?: string }>
+}) {
+  const params = await searchParams
+  const redirectTo = sanitizeRedirect(params?.redirect)
   const session = await auth.api.getSession({ headers: await headers() })
-  if (session?.user) redirect('/admin')
+  if (session?.user) redirect(redirectTo)
 
   return (
     <main className="flex min-h-screen flex-col bg-background">
@@ -34,7 +45,7 @@ export default async function AdminLoginPage() {
             </p>
           </div>
 
-          <AdminAuthForm />
+          <AdminAuthForm redirectTo={redirectTo} />
         </div>
       </div>
     </main>

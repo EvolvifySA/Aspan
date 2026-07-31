@@ -3,7 +3,15 @@
 import { useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ImagePlus, Loader2, LogOut, Trash2, Upload, X } from 'lucide-react'
+import {
+  ClipboardList,
+  ImagePlus,
+  Loader2,
+  LogOut,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { createPost, deletePost } from '@/app/actions/posts'
 import { AspanLogo } from '@/components/aspan/logo'
@@ -121,6 +129,14 @@ export function AdminDashboard({
         <p className="mt-1 text-muted-foreground">
           Publique fotos e novidades no feed público da ASPAN.
         </p>
+
+        <a
+          href="/admin/forms"
+          className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-5 py-3 text-sm font-semibold text-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-secondary"
+        >
+          <ClipboardList className="h-4 w-4 text-primary" />
+          Controle de Forms
+        </a>
 
         {/* Formulário de nova publicação */}
         <form

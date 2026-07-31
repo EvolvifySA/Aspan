@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: painel-atualizacoes-db
+    container_name: aspan-db
     restart: unless-stopped
     ports:
       - '5432:5432'
@@ -18,5 +18,43 @@ services:
       timeout: 5s
       retries: 10
 
+  forms:
+    build:
+      context: ./apps/forms
+    container_name: aspan-forms
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://aspan:aspan@db:5432/aspan
+      BETTER_AUTH_INTERNAL_URL: http://site:3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+  site:
+    build:
+      context: .
+      args:
+        FORMS_INTERNAL_URL: http://forms:3001
+    container_name: aspan-site
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://aspan:aspan@db:5432/aspan
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-in-production}
+      FORMS_INTERNAL_URL: http://forms:3001
+    volumes:
+      - uploads:/app/public/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      forms:
+        condition: service_started
+
 volumes:
   pgdata:
+  uploads:

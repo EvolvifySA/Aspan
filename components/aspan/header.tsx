@@ -83,10 +83,10 @@ export function Header() {
       <div
         className={cn(
           'mx-auto mt-2 max-w-6xl overflow-hidden rounded-3xl border border-border bg-card/95 backdrop-blur-xl transition-all duration-300 md:hidden',
-          open ? 'max-h-96 opacity-100' : 'pointer-events-none max-h-0 opacity-0',
+          open ? 'max-h-[calc(100vh-6rem)] overflow-y-auto opacity-100' : 'pointer-events-none max-h-0 opacity-0',
         )}
       >
-        <nav className="flex flex-col p-3">
+        <nav className="flex flex-col p-3 pb-5">
           {navLinks.map((link) => (
             <Link
               key={link.href}

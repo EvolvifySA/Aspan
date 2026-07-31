@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   description:
     'A ASPAN cuida com amor e dignidade de idosos, oferecendo atendimento multiprofissional, atividades e convívio de qualidade. Ajude, doe e faça toda a diferença.',
   generator: 'v0.app',
+  icons: {
+    icon: '/images/aspan-logo.webp',
+    shortcut: '/images/aspan-logo.webp',
+    apple: '/images/aspan-logo.webp',
+  },
 }
 
 export const viewport: Viewport = {

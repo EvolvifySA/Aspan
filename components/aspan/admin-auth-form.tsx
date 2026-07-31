@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { signIn, signUp } from '@/lib/auth-client'
 
-export function AdminAuthForm() {
+export function AdminAuthForm({ redirectTo = '/admin' }: { redirectTo?: string }) {
   const router = useRouter()
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
   const [name, setName] = useState('')
@@ -27,7 +27,7 @@ export function AdminAuthForm() {
         const { error } = await signIn.email({ email, password })
         if (error) throw new Error(error.message || 'E-mail ou senha inválidos.')
       }
-      router.push('/admin')
+      router.push(redirectTo)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Algo deu errado.')

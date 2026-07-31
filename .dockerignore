@@ -1,0 +1,12 @@
+node_modules
+.next
+.env
+.env.local
+public/uploads
+apps/forms/node_modules
+apps/forms/dist
+apps/forms/dev.db
+apps/forms/*.db
+apps/forms/.env
+.git
+*.log

@@ -1,0 +1,11 @@
+node_modules
+dist
+dev.db
+*.db
+.env
+prisma
+prisma.config.ts
+*.xlsx
+Banco*.txt
+.git
+*.log

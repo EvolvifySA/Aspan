@@ -1,4 +1,12 @@
-import { pgTable, text, timestamp, boolean, serial } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core'
 
 // --- Better Auth required tables -------------------------------------------
 // Column names are camelCase to match Better Auth's defaults. Do not rename.
@@ -64,4 +72,42 @@ export const posts = pgTable('posts', {
   imageUrl: text('imageUrl').notNull(),
   caption: text('caption').notNull().default(''),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
+})
+
+export const solicitacoesVaga = pgTable('solicitacoes_vaga', {
+  id: text('id').primaryKey(),
+  nomeSolicitante: text('nome_solicitante').notNull(),
+  emailSolicitante: text('email_solicitante').notNull().unique(),
+  grauParentesco: text('grau_parentesco').notNull(),
+  grauParentescoOutro: text('grau_parentesco_outro'),
+  endereco: text('endereco').notNull(),
+  cidade: text('cidade').notNull(),
+  estado: text('estado').notNull(),
+  telefoneContato: text('telefone_contato').notNull(),
+  nomeIdoso: text('nome_idoso').notNull(),
+  idadeIdoso: integer('idade_idoso').notNull(),
+  generoIdoso: text('genero_idoso'),
+  estadoConjugal: text('estado_conjugal'),
+  doencas: jsonb('doencas').notNull(),
+  doencaOutro: text('doenca_outro'),
+  nivelOrientacao: text('nivel_orientacao'),
+  mobilidade: text('mobilidade').notNull(),
+  avaliacaoAbvd: jsonb('avaliacao_abvd').notNull(),
+  avaliacaoAivd: jsonb('avaliacao_aivd').notNull(),
+  medicacoes: text('medicacoes').notNull(),
+  interdicao: boolean('interdicao').notNull().default(false),
+  procuracao: boolean('procuracao').notNull().default(false),
+  familiares: text('familiares'),
+  fonteRenda: text('fonte_renda'),
+  rendaMensalFaixa: text('renda_mensal_faixa'),
+  rendaMensalOutro: text('renda_mensal_outro'),
+  historicoLar: boolean('historico_lar').notNull().default(false),
+  detalhesHistoricoLar: text('detalhes_historico_lar'),
+  grauClassificacao: integer('grau_classificacao').notNull(),
+  situacao: text('situacao').notNull().default('Esperando atendimento'),
+  observacao: text('observacao'),
+  usuarioAlteracao: text('usuario_alteracao'),
+  dataAlteracao: timestamp('data_alteracao'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
