@@ -47,22 +47,24 @@ function getRecordDate(item) {
 }
 
 function formatDate(value) {
-  if (!value) return "-";
+  if (!value) return "Nao informado";
   return format(new Date(value), "dd/MM/yyyy", { locale: ptBR });
 }
 
 function formatDateTime(value) {
-  if (!value) return "-";
+  if (!value) return "Nao informado";
   return format(new Date(value), "dd/MM/yyyy HH:mm", { locale: ptBR });
 }
 
 function getAgeLabel(item) {
-  if (item.idade_idoso == null) return "-";
+  if (item.idade_idoso == null) return "Nao informado";
   return `${item.idade_idoso} anos`;
 }
 
 function formatBoolean(value) {
-  return value ? "Sim" : "Nao";
+  if (value === true) return "Sim";
+  if (value === false) return "Nao";
+  return "Nao informado";
 }
 
 function formatDoencas(item) {
@@ -70,18 +72,18 @@ function formatDoencas(item) {
   if (item.doenca_outro && doencas.includes("Outro")) {
     doencas[doencas.indexOf("Outro")] = `Outro: ${item.doenca_outro}`;
   }
-  return doencas.length > 0 ? doencas.join(", ") : "-";
+  return doencas.length > 0 ? doencas.join(", ") : "Nao informado";
 }
 
 function formatFunctionalAssessment(values, fields) {
-  if (!values || typeof values !== "object") return "-";
+  if (!values || typeof values !== "object") return "Nao informado";
   const entries = fields
     .map((field) => {
       const value = values[field.key];
       return value ? `${field.label}: ${value}` : null;
     })
     .filter(Boolean);
-  return entries.length > 0 ? entries.join("; ") : "-";
+  return entries.length > 0 ? entries.join("; ") : "Nao informado";
 }
 
 function getEndereco(item) {
@@ -93,6 +95,8 @@ export default function GerenciarCadastros() {
   const [busca, setBusca] = useState("");
   const [situacao, setSituacao] = useState("all");
   const [grau, setGrau] = useState("all");
+  const [origem, setOrigem] = useState("all");
+  const [revisao, setRevisao] = useState("all");
   const [detalheSelecionado, setDetalheSelecionado] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -107,10 +111,17 @@ export default function GerenciarCadastros() {
         item.cidade?.toLowerCase().includes(query) ||
         item.telefone_contato?.toLowerCase().includes(query);
       const matchSituacao = situacao === "all" || item.situacao === situacao;
-      const matchGrau = grau === "all" || String(item.grau_classificacao) === grau;
-      return matchBusca && matchSituacao && matchGrau;
+      const matchGrau =
+        grau === "all" ||
+        (grau === "none" ? item.grau_classificacao == null : String(item.grau_classificacao) === grau);
+      const matchOrigem =
+        origem === "all" ||
+        (origem === "legado" ? item.origem !== "formulario_atual" : item.origem === origem);
+      const matchRevisao =
+        revisao === "all" || String(Boolean(item.necessita_revisao)) === revisao;
+      return matchBusca && matchSituacao && matchGrau && matchOrigem && matchRevisao;
     });
-  }, [busca, grau, situacao, solicitacoes]);
+  }, [busca, grau, origem, revisao, situacao, solicitacoes]);
 
   const exportarCsv = () => {
     const rows = filtradas.map((item) => ({
@@ -140,6 +151,8 @@ export default function GerenciarCadastros() {
       AIVD: formatFunctionalAssessment(item.avaliacao_aivd, AIVD_FIELDS),
       Situacao: item.situacao,
       Grau: item.grau_classificacao,
+      Origem: item.origem === "formulario_atual" ? "Formulario atual" : "Legado",
+      "Necessita revisao": item.necessita_revisao ? "Sim" : "Nao",
       Data: formatDate(getRecordDate(item)),
       "Ultima alteracao": item.usuario_alteracao || "-",
     }));
@@ -282,7 +295,7 @@ export default function GerenciarCadastros() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-5">
               <div className="space-y-2">
                 <Label>Busca geral</Label>
                 <div className="relative">
@@ -325,6 +338,29 @@ export default function GerenciarCadastros() {
                     <SelectItem value="1">Grau 1</SelectItem>
                     <SelectItem value="2">Grau 2</SelectItem>
                     <SelectItem value="3">Grau 3</SelectItem>
+                    <SelectItem value="none">Sem classificacao</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Origem</Label>
+                <Select value={origem} onValueChange={setOrigem}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="formulario_atual">Formulario atual</SelectItem>
+                    <SelectItem value="legado">Legado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Revisao</Label>
+                <Select value={revisao} onValueChange={setRevisao}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="true">Pendente</SelectItem>
+                    <SelectItem value="false">Concluida ou dispensada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -373,15 +409,21 @@ export default function GerenciarCadastros() {
                   ) : (
                     filtradas.map((item) => (
                       <TableRow key={item.id} className="hover:bg-slate-50">
-                        <TableCell className="font-semibold text-slate-900">{item.nome_idoso}</TableCell>
-                        <TableCell>{item.nome_solicitante}</TableCell>
-                        <TableCell>{item.grau_parentesco || "-"}</TableCell>
-                        <TableCell>{item.telefone_contato || "-"}</TableCell>
-                        <TableCell>{item.cidade}</TableCell>
+                        <TableCell className="font-semibold text-slate-900">
+                          <div>{item.nome_idoso || "Nao informado"}</div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {item.origem !== "formulario_atual" && <Badge variant="outline">Legado</Badge>}
+                            {item.necessita_revisao && <Badge className="bg-amber-100 text-amber-800">Revisao</Badge>}
+                          </div>
+                        </TableCell>
+                        <TableCell>{item.nome_solicitante || "Nao informado"}</TableCell>
+                        <TableCell>{item.grau_parentesco || "Nao informado"}</TableCell>
+                        <TableCell>{item.telefone_contato || "Nao informado"}</TableCell>
+                        <TableCell>{item.cidade || "Nao informado"}</TableCell>
                         <TableCell>{formatDate(getRecordDate(item))}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`${grauColors[item.grau_classificacao] || grauColors[1]} border`}>
-                            Grau {item.grau_classificacao}
+                          <Badge variant="outline" className={`${grauColors[item.grau_classificacao] || "bg-slate-100 text-slate-700"} border`}>
+                            {item.grau_classificacao ? `Grau ${item.grau_classificacao}` : "Sem classificacao"}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -390,7 +432,7 @@ export default function GerenciarCadastros() {
                           </Badge>
                         </TableCell>
                         <TableCell className="max-w-xs truncate text-slate-600">
-                          {item.observacao || "-"}
+                          {item.observacao || "Nao informado"}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap items-center gap-2">
@@ -433,23 +475,32 @@ export default function GerenciarCadastros() {
 
             {detalheSelecionado ? (
               <div className="grid gap-4 md:grid-cols-2">
+                {detalheSelecionado.origem !== "formulario_atual" && (
+                  <div className="flex flex-wrap items-center gap-2 border border-amber-200 bg-amber-50 p-3 md:col-span-2">
+                    <Badge variant="outline">Legado</Badge>
+                    {detalheSelecionado.necessita_revisao && <Badge className="bg-amber-200 text-amber-900">Revisao necessaria</Badge>}
+                    <span className="text-sm text-amber-900">
+                      {detalheSelecionado.legacy_source_sheet}, linha {detalheSelecionado.legacy_source_row}
+                    </span>
+                  </div>
+                )}
                 <Card className="border-0 bg-slate-50 shadow-none">
                   <CardContent className="space-y-3 p-4">
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Solicitante</p>
-                      <p className="font-semibold text-slate-900">{detalheSelecionado.nome_solicitante}</p>
+                      <p className="font-semibold text-slate-900">{detalheSelecionado.nome_solicitante || "Nao informado"}</p>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-slate-600">
                       <Phone className="h-4 w-4" />
-                      {detalheSelecionado.telefone_contato || "-"}
+                      {detalheSelecionado.telefone_contato || "Nao informado"}
                     </div>
                     <div className="flex items-center gap-3 text-sm text-slate-600">
                       <UserRound className="h-4 w-4" />
                       {detalheSelecionado.grau_parentesco === "Outros" && detalheSelecionado.grau_parentesco_outro
                         ? detalheSelecionado.grau_parentesco_outro
-                        : detalheSelecionado.grau_parentesco || "-"}
+                        : detalheSelecionado.grau_parentesco || "Nao informado"}
                     </div>
-                    <div className="text-sm text-slate-600">E-mail: {detalheSelecionado.email_solicitante || "-"}</div>
+                    <div className="text-sm text-slate-600">E-mail: {detalheSelecionado.email_solicitante || "Nao informado"}</div>
                     <div className="flex items-center gap-3 text-sm text-slate-600">
                       <Clock3 className="h-4 w-4" />
                       Atualizado em {formatDateTime(detalheSelecionado.updatedAt || detalheSelecionado.data_alteracao || detalheSelecionado.createdAt)}
@@ -461,13 +512,13 @@ export default function GerenciarCadastros() {
                   <CardContent className="space-y-3 p-4">
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Idoso</p>
-                      <p className="font-semibold text-slate-900">{detalheSelecionado.nome_idoso}</p>
+                      <p className="font-semibold text-slate-900">{detalheSelecionado.nome_idoso || "Nao informado"}</p>
                     </div>
                     <div className="text-sm text-slate-600">Idade: {getAgeLabel(detalheSelecionado)}</div>
-                    <div className="text-sm text-slate-600">Genero: {detalheSelecionado.genero_idoso || "-"}</div>
-                    <div className="text-sm text-slate-600">Estado conjugal: {detalheSelecionado.estado_conjugal || "-"}</div>
-                    <div className="text-sm text-slate-600">Mobilidade: {detalheSelecionado.mobilidade || "-"}</div>
-                    <div className="text-sm text-slate-600">Orientacao: {detalheSelecionado.nivel_orientacao || "-"}</div>
+                    <div className="text-sm text-slate-600">Genero: {detalheSelecionado.genero_idoso || "Nao informado"}</div>
+                    <div className="text-sm text-slate-600">Estado conjugal: {detalheSelecionado.estado_conjugal || "Nao informado"}</div>
+                    <div className="text-sm text-slate-600">Mobilidade: {detalheSelecionado.mobilidade || "Nao informado"}</div>
+                    <div className="text-sm text-slate-600">Orientacao: {detalheSelecionado.nivel_orientacao || "Nao informado"}</div>
                     <div className="text-sm text-slate-600">Doencas: {formatDoencas(detalheSelecionado)}</div>
                   </CardContent>
                 </Card>
@@ -475,24 +526,32 @@ export default function GerenciarCadastros() {
                 <Card className="border-0 bg-slate-50 shadow-none md:col-span-2">
                   <CardContent className="grid gap-3 p-4 md:grid-cols-2">
                     <div className="text-sm text-slate-600">
-                      Endereco: {[getEndereco(detalheSelecionado), detalheSelecionado.cidade, detalheSelecionado.estado].filter(Boolean).join(", ") || "-"}
+                      Endereco: {[getEndereco(detalheSelecionado), detalheSelecionado.cidade, detalheSelecionado.estado].filter(Boolean).join(", ") || "Nao informado"}
                     </div>
                     <div className="text-sm text-slate-600">Situacao: {detalheSelecionado.situacao || "-"}</div>
-                    <div className="text-sm text-slate-600">Grau de classificacao: Grau {detalheSelecionado.grau_classificacao ?? "-"}</div>
-                    <div className="text-sm text-slate-600">Responsavel pela ultima alteracao: {detalheSelecionado.usuario_alteracao || "-"}</div>
-                    <div className="text-sm text-slate-600 md:col-span-2">Medicacoes: {detalheSelecionado.medicacoes || "-"}</div>
+                    <div className="text-sm text-slate-600">Grau de classificacao: {detalheSelecionado.grau_classificacao ? `Grau ${detalheSelecionado.grau_classificacao}` : "Sem classificacao"}</div>
+                    <div className="text-sm text-slate-600">Responsavel pela ultima alteracao: {detalheSelecionado.usuario_alteracao || "Nao informado"}</div>
+                    <div className="text-sm text-slate-600 md:col-span-2">Medicacoes: {detalheSelecionado.medicacoes || "Nao informado"}</div>
                     <div className="text-sm text-slate-600">Interditado: {formatBoolean(detalheSelecionado.interdicao)}</div>
                     <div className="text-sm text-slate-600">Procuracao: {formatBoolean(detalheSelecionado.procuracao)}</div>
-                    <div className="text-sm text-slate-600 md:col-span-2">Familiares: {detalheSelecionado.familiares || "-"}</div>
-                    <div className="text-sm text-slate-600">Fonte de renda: {detalheSelecionado.fonte_renda || "-"}</div>
+                    <div className="text-sm text-slate-600 md:col-span-2">Familiares: {detalheSelecionado.familiares || "Nao informado"}</div>
+                    <div className="text-sm text-slate-600">Fonte de renda: {detalheSelecionado.fonte_renda || "Nao informado"}</div>
                     <div className="text-sm text-slate-600">
-                      Renda mensal: {detalheSelecionado.renda_mensal_faixa === "Outro" && detalheSelecionado.renda_mensal_outro ? detalheSelecionado.renda_mensal_outro : detalheSelecionado.renda_mensal_faixa || "-"}
+                      Renda mensal: {detalheSelecionado.renda_mensal_faixa === "Outro" && detalheSelecionado.renda_mensal_outro ? detalheSelecionado.renda_mensal_outro : detalheSelecionado.renda_mensal_faixa || "Nao informado"}
                     </div>
                     <div className="text-sm text-slate-600">Historico de ILPI: {formatBoolean(detalheSelecionado.historico_lar)}</div>
-                    <div className="text-sm text-slate-600">Detalhes ILPI: {detalheSelecionado.detalhes_historico_lar || "-"}</div>
+                    <div className="text-sm text-slate-600">Detalhes ILPI: {detalheSelecionado.detalhes_historico_lar || "Nao informado"}</div>
                     <div className="text-sm text-slate-600 md:col-span-2">ABVD: {formatFunctionalAssessment(detalheSelecionado.avaliacao_abvd, ABVD_FIELDS)}</div>
                     <div className="text-sm text-slate-600 md:col-span-2">AIVD: {formatFunctionalAssessment(detalheSelecionado.avaliacao_aivd, AIVD_FIELDS)}</div>
-                    <div className="text-sm text-slate-600 md:col-span-2">Observacao: {detalheSelecionado.observacao || "-"}</div>
+                    <div className="text-sm text-slate-600 md:col-span-2">Observacao: {detalheSelecionado.observacao || "Nao informado"}</div>
+                    {detalheSelecionado.avisos_migracao?.length > 0 && (
+                      <div className="md:col-span-2">
+                        <p className="mb-2 text-sm font-semibold text-slate-700">Avisos da migracao</p>
+                        <div className="flex flex-wrap gap-2">
+                          {detalheSelecionado.avisos_migracao.map((warning) => <Badge key={warning} variant="outline">{warning}</Badge>)}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

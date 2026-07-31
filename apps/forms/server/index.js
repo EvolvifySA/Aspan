@@ -5,8 +5,9 @@ import cookieParser from "cookie-parser";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import pg from "pg";
 import { z } from "zod";
+import { pool } from "./db.js";
+import { runMigrations } from "./migrate.js";
 import {
   ABVD_FIELDS,
   AIVD_FIELDS,
@@ -25,17 +26,12 @@ import {
   SITUACAO_OPTIONS,
 } from "../shared/solicitacao.js";
 
-const { Pool } = pg;
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
 const AUTH_INTERNAL_URL =
   process.env.BETTER_AUTH_INTERNAL_URL ||
   process.env.BETTER_AUTH_URL ||
   "http://localhost:3000";
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 app.use(
   cors({
@@ -85,6 +81,14 @@ const solicitacaoFields = `
   observacao,
   usuario_alteracao,
   data_alteracao,
+  origem,
+  necessita_revisao,
+  avisos_migracao,
+  legacy_import_row_id,
+  legacy_source_sheet,
+  legacy_source_row,
+  revisao_resolvida_em,
+  revisao_resolvida_por,
   created_at AS "createdAt",
   updated_at AS "updatedAt"
 `;
@@ -239,9 +243,33 @@ const solicitacaoCreateSchema = z
 
 const solicitacaoUpdateSchema = z.object({
   situacao: z.enum(SITUACAO_OPTIONS),
-  grau_classificacao: z.coerce.number().int().min(1).max(3),
+  grau_classificacao: z.preprocess(
+    (value) => (value === "" || value === undefined ? null : value),
+    z.coerce.number().int().min(1).max(3).nullable(),
+  ),
   observacao: optionalTextSchema(),
 });
+
+const nullableTextSchema = z.union([z.string().trim().min(1), z.null()]).optional();
+const nullableBooleanSchema = z.union([z.boolean(), z.null()]).optional();
+const legacyReviewSchema = z
+  .object({
+    nome_solicitante: nullableTextSchema,
+    email_solicitante: z.union([z.string().trim().email(), z.null()]).optional(),
+    telefone_contato: nullableTextSchema,
+    nome_idoso: nullableTextSchema,
+    idade_idoso: z.union([z.coerce.number().int().min(0).max(120), z.null()]).optional(),
+    cidade: nullableTextSchema,
+    estado: z.union([z.string().trim().length(2).transform((value) => value.toUpperCase()), z.null()]).optional(),
+    grau_classificacao: z.union([z.coerce.number().int().min(1).max(3), z.null()]).optional(),
+    situacao: z.enum(SITUACAO_OPTIONS).optional(),
+    observacao: z.union([z.string().trim(), z.null()]).optional(),
+    interdicao: nullableBooleanSchema,
+    procuracao: nullableBooleanSchema,
+    historico_lar: nullableBooleanSchema,
+    revisao_concluida: z.boolean().optional(),
+  })
+  .strict();
 
 function normalizeOptionalString(value) {
   if (value === null || value === undefined || value === "") {
@@ -253,6 +281,9 @@ function normalizeOptionalString(value) {
 function serializeSolicitacao(record) {
   return {
     ...record,
+    avisos_migracao: Array.isArray(record.avisos_migracao)
+      ? record.avisos_migracao
+      : [],
     doencas: Array.isArray(record.doencas) ? record.doencas : [],
     avaliacao_abvd:
       record.avaliacao_abvd &&
@@ -463,6 +494,87 @@ app.put(
   }),
 );
 
+app.get(
+  "/api/forms/solicitacoes/:id/legado",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const { rows } = await pool.query(
+      `SELECT lir.source_sheet, lir.source_row, lir.style_color,
+              lir.raw_data, lir.normalized_data, lir.warnings,
+              lib.id AS batch_id, lib.source_filename, lib.file_sha256,
+              lib.completed_at
+       FROM legacy_import_rows lir
+       JOIN legacy_import_batches lib ON lib.id = lir.batch_id
+       JOIN solicitacoes_vaga sv ON sv.legacy_import_row_id = lir.id
+       WHERE sv.id = $1`,
+      [req.params.id],
+    );
+    if (!rows[0]) return res.status(404).json({ message: "Registro legado nao encontrado." });
+    return res.json(rows[0]);
+  }),
+);
+
+app.patch(
+  "/api/forms/solicitacoes/:id/revisao",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const data = legacyReviewSchema.parse(req.body);
+    const record = await pool.query(
+      "SELECT origem FROM solicitacoes_vaga WHERE id = $1",
+      [req.params.id],
+    );
+    if (!record.rows[0]) return res.status(404).json({ message: "Record not found" });
+    if (record.rows[0].origem === "formulario_atual") {
+      return res.status(400).json({ message: "A revisao e exclusiva para registros legados." });
+    }
+
+    const allowedFields = [
+      "nome_solicitante", "email_solicitante", "telefone_contato", "nome_idoso",
+      "idade_idoso", "cidade", "estado", "grau_classificacao", "situacao",
+      "observacao", "interdicao", "procuracao", "historico_lar",
+    ];
+    const assignments = [];
+    const values = [req.params.id];
+    for (const field of allowedFields) {
+      if (!(field in data)) continue;
+      values.push(data[field]);
+      assignments.push(`${field} = $${values.length}`);
+    }
+
+    const reviewer = req.adminUser.name || req.adminUser.email || "Administrador";
+    const now = new Date();
+    if (data.revisao_concluida !== undefined) {
+      values.push(!data.revisao_concluida);
+      assignments.push(`necessita_revisao = $${values.length}`);
+      if (data.revisao_concluida) {
+        values.push(now, reviewer);
+        assignments.push(
+          `revisao_resolvida_em = $${values.length - 1}`,
+          `revisao_resolvida_por = $${values.length}`,
+        );
+      } else {
+        assignments.push("revisao_resolvida_em = NULL", "revisao_resolvida_por = NULL");
+      }
+    }
+
+    values.push(reviewer, now);
+    assignments.push(
+      `usuario_alteracao = $${values.length - 1}`,
+      `data_alteracao = $${values.length}`,
+      `updated_at = $${values.length}`,
+    );
+
+    const { rows } = await pool.query(
+      `UPDATE solicitacoes_vaga
+       SET ${assignments.join(", ")}
+       WHERE id = $1
+       RETURNING ${solicitacaoFields}`,
+      values,
+    );
+    return res.json(serializeSolicitacao(rows[0]));
+  }),
+);
+
 app.delete(
   "/api/forms/solicitacoes/:id",
   requireAdmin,
@@ -501,6 +613,8 @@ if (fs.existsSync(distPath)) {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
+
+await runMigrations();
 
 app.listen(PORT, () => {
   console.log(`ASPAN Forms running on http://localhost:${PORT}`);

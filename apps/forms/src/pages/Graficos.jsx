@@ -80,10 +80,12 @@ export default function Graficos() {
     return { cidades, doencas, situacao, faixas, graus, mobilidade, fonteRenda, rendaMensal };
   }, [solicitacoes]);
 
-  const idadeMedia =
-    solicitacoes.length > 0
-      ? (solicitacoes.reduce((sum, item) => sum + (Number(item.idade_idoso) || 0), 0) / solicitacoes.length).toFixed(1)
-      : "0";
+  const idadesValidas = solicitacoes
+    .map((item) => Number(item.idade_idoso))
+    .filter((idade) => Number.isFinite(idade) && idade > 0);
+  const idadeMedia = idadesValidas.length
+    ? (idadesValidas.reduce((sum, idade) => sum + idade, 0) / idadesValidas.length).toFixed(1)
+    : "0";
 
   return (
     <div className="min-h-screen p-4 md:p-8">

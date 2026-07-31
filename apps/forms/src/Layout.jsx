@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   FileDown,
   Edit3,
+  FileSearch,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
 const navigationItems = [
   { title: "Gerenciar Cadastros", url: "/admin/forms", icon: ClipboardList },
   { title: "Editar Situacao", url: "/admin/forms/editar-situacao", icon: Edit3 },
+  { title: "Revisar Migracao", url: "/admin/forms/revisar-migracao", icon: FileSearch },
   { title: "Gerar Relatorios", url: "/admin/forms/gerar-relatorios", icon: FileDown },
   { title: "Graficos", url: "/admin/forms/graficos", icon: BarChart3 },
 ];

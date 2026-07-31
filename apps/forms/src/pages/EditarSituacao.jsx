@@ -89,7 +89,7 @@ export default function EditarSituacao() {
   const abrirEdicao = (item) => {
     setEditando(item);
     setNovaSituacao(item.situacao);
-    setNovoGrau(String(item.grau_classificacao || 1));
+    setNovoGrau(item.grau_classificacao ? String(item.grau_classificacao) : "none");
     setObservacao(item.observacao || "");
   };
 
@@ -100,7 +100,7 @@ export default function EditarSituacao() {
     try {
       await solicitacaoApi.update(editando.id, {
         situacao: novaSituacao,
-        grau_classificacao: Number(novoGrau),
+        grau_classificacao: novoGrau === "none" ? null : Number(novoGrau),
         observacao,
       });
       await refresh();
@@ -218,8 +218,8 @@ export default function EditarSituacao() {
                         <TableCell>{item.nome_solicitante}</TableCell>
                         <TableCell>{formatDate(getRecordDate(item))}</TableCell>
                         <TableCell>
-                          <Badge className={`${grauColors[item.grau_classificacao] || grauColors[1]} border`}>
-                            Grau {item.grau_classificacao || 1}
+                          <Badge className={`${grauColors[item.grau_classificacao] || "bg-slate-100 text-slate-700"} border`}>
+                            {item.grau_classificacao ? `Grau ${item.grau_classificacao}` : "Sem classificacao"}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -258,6 +258,7 @@ export default function EditarSituacao() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Sem classificacao</SelectItem>
                     <SelectItem value="1">Grau 1 - Independente</SelectItem>
                     <SelectItem value="2">Grau 2 - Dependencia parcial</SelectItem>
                     <SelectItem value="3">Grau 3 - Dependencia total</SelectItem>

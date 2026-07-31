@@ -9,6 +9,7 @@ import NovaSolicitacao from "./pages/NovaSolicitacao";
 import EditarSituacao from "./pages/EditarSituacao";
 import GerarRelatorios from "./pages/GerarRelatorios";
 import Graficos from "./pages/Graficos";
+import RevisarMigracao from "./pages/RevisarMigracao";
 import PageNotFound from "./lib/PageNotFound";
 
 function AdminApp() {
@@ -32,6 +33,7 @@ function App() {
             <Route path="/admin/forms" element={<GerenciarCadastros />} />
             <Route path="/GerenciarCadastros" element={<Navigate to="/admin/forms" replace />} />
             <Route path="/admin/forms/editar-situacao" element={<EditarSituacao />} />
+            <Route path="/admin/forms/revisar-migracao" element={<RevisarMigracao />} />
             <Route path="/EditarSituacao" element={<Navigate to="/admin/forms/editar-situacao" replace />} />
             <Route path="/admin/forms/gerar-relatorios" element={<GerarRelatorios />} />
             <Route path="/GerarRelatorios" element={<Navigate to="/admin/forms/gerar-relatorios" replace />} />

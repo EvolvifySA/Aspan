@@ -7,5 +7,4 @@ dev.db
 *.db
 prisma/
 prisma.config.ts
-*.xlsx
 Banco*.txt

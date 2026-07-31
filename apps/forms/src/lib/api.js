@@ -58,5 +58,7 @@ export const solicitacaoApi = {
   list: () => apiRequest("/solicitacoes"),
   create: (payload) => apiRequest("/solicitacoes", { method: "POST", body: payload }),
   update: (id, payload) => apiRequest(`/solicitacoes/${id}`, { method: "PUT", body: payload }),
+  review: (id, payload) => apiRequest(`/solicitacoes/${id}/revisao`, { method: "PATCH", body: payload }),
+  legacy: (id) => apiRequest(`/solicitacoes/${id}/legado`),
   remove: (id) => apiRequest(`/solicitacoes/${id}`, { method: "DELETE" }),
 };

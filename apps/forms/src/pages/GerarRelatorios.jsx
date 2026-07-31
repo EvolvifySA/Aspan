@@ -28,7 +28,9 @@ function formatDate(value) {
 }
 
 function formatBoolean(value) {
-  return value ? "Sim" : "Nao";
+  if (value === true) return "Sim";
+  if (value === false) return "Nao";
+  return "Nao informado";
 }
 
 function formatDoencas(item) {
@@ -120,7 +122,7 @@ function buildFields(item) {
       ["Detalhes ILPI", item.detalhes_historico_lar],
     ],
     Situacao: [
-      ["Grau", `Grau ${item.grau_classificacao ?? "-"}`],
+      ["Grau", item.grau_classificacao ? `Grau ${item.grau_classificacao}` : "Sem classificacao"],
       ["Situacao", item.situacao],
       ["Observacao", item.observacao],
       ["Responsavel", item.usuario_alteracao],
@@ -387,9 +389,9 @@ export default function GerarRelatorios() {
                   filtradas.map((item) => (
                     <div key={item.id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 transition hover:bg-slate-100">
                       <div>
-                        <p className="font-semibold text-slate-900">{item.nome_idoso}</p>
-                        <p className="text-sm text-slate-600">{item.nome_solicitante}</p>
-                        <p className="text-xs text-slate-500">Responsavel: {item.usuario_alteracao || "-"}</p>
+                        <p className="font-semibold text-slate-900">{item.nome_idoso || "Nao informado"}</p>
+                        <p className="text-sm text-slate-600">{item.nome_solicitante || "Nao informado"}</p>
+                        <p className="text-xs text-slate-500">Responsavel: {item.usuario_alteracao || "Nao informado"}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => gerarHtml(item)} className="gap-2 bg-slate-900 text-white hover:bg-slate-800">
