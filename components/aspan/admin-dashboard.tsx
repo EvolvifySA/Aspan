@@ -12,6 +12,9 @@ import {
   Trash2,
   Upload,
   X,
+  CircleDollarSign,
+  CreditCard,
+  ShieldCheck,
 } from 'lucide-react'
 import { signOut } from '@/lib/auth-client'
 import { createPost, deletePost } from '@/app/actions/posts'
@@ -23,6 +26,7 @@ import {
 import { AspanLogo } from '@/components/aspan/logo'
 import type { FeedPostData } from '@/components/aspan/feed-post'
 import { PostImageCarousel } from '@/components/aspan/post-image-carousel'
+import type { AdminDonation } from '@/lib/donations-admin'
 
 function formatDate(date: Date | string) {
   const d = typeof date === 'string' ? new Date(date) : date
@@ -44,6 +48,23 @@ function formatFileSize(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`
 }
 
+function formatCurrency(value: string) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value))
+}
+
+const donationStatusLabels: Record<string, string> = {
+  paid: 'Confirmada',
+  partially_refunded: 'Devolvida parcialmente',
+  refunded: 'Devolvida',
+  rejected: 'Recusada',
+  cancelled: 'Cancelada',
+  processing: 'Em processamento',
+  action_required: 'Aguardando ação',
+  pending: 'Aguardando pagamento',
+  creating: 'Criando checkout',
+  checkout_error: 'Falha no checkout',
+}
+
 function getPostImages(post: FeedPostData) {
   return Array.isArray(post.imageUrls)
     ? post.imageUrls.filter((image): image is string => typeof image === 'string')
@@ -54,10 +75,24 @@ export function AdminDashboard({
   posts,
   transparencyDocuments,
   userName,
+  donations = [],
+  donationTotal = '0.00',
+  paidDonationCount = 0,
+  mercadoPagoConnected = false,
+  mercadoPagoConnectedAt = null,
+  mercadoPagoNotice = null,
+  mercadoPagoTestMode = false,
 }: {
   posts: FeedPostData[]
   transparencyDocuments: TransparencyDocumentData[]
   userName: string
+  donations?: AdminDonation[]
+  donationTotal?: string
+  paidDonationCount?: number
+  mercadoPagoConnected?: boolean
+  mercadoPagoConnectedAt?: Date | string | null
+  mercadoPagoNotice?: string | null
+  mercadoPagoTestMode?: boolean
 }) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -206,6 +241,106 @@ export function AdminDashboard({
           <ClipboardList className="h-4 w-4 text-primary" />
           Controle de Forms
         </a>
+
+        <section className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="flex items-center gap-2 font-[family-name:var(--font-poppins)] text-lg font-bold">
+                <CreditCard className="h-5 w-5 text-accent" />
+                Doações online
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Conecte a conta recebedora e acompanhe pagamentos confirmados pelo Mercado Pago.
+              </p>
+            </div>
+            {demoMode ? (
+              <span className="rounded-full border border-border px-5 py-3 text-sm text-muted-foreground">
+                Configure o banco para conectar
+              </span>
+            ) : (
+              <a
+                href="/api/admin/mercadopago/connect"
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {mercadoPagoConnected ? 'Reconectar Mercado Pago' : 'Conectar Mercado Pago'}
+              </a>
+            )}
+          </div>
+          {demoMode ? (
+            <p className="mt-4 rounded-xl border border-amber-600/20 bg-amber-600/5 px-4 py-3 text-sm text-amber-800">
+              O modo demo não salva doações nem tokens. Configure o banco de dados para ativar o relatório financeiro.
+            </p>
+          ) : mercadoPagoConnected ? (
+            <p className="mt-4 rounded-xl border border-emerald-600/20 bg-emerald-600/5 px-4 py-3 text-sm text-emerald-800">
+              Conta {mercadoPagoTestMode ? 'de teste ' : ''}Mercado Pago conectada{mercadoPagoConnectedAt ? ` em ${formatDate(mercadoPagoConnectedAt)}` : ''}.
+            </p>
+          ) : (
+            <p className="mt-4 rounded-xl border border-amber-600/20 bg-amber-600/5 px-4 py-3 text-sm text-amber-800">
+              Conecte a conta ASPAN do Mercado Pago para habilitar pagamentos online.
+            </p>
+          )}
+          {mercadoPagoNotice && (
+            <p role="status" className="mt-3 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+              {mercadoPagoNotice}
+            </p>
+          )}
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-background p-5">
+              <p className="text-sm font-medium text-muted-foreground">Total líquido arrecadado</p>
+              <p className="mt-2 flex items-center gap-2 font-[family-name:var(--font-poppins)] text-2xl font-extrabold">
+                <CircleDollarSign className="h-6 w-6 text-primary" />
+                {formatCurrency(donationTotal)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background p-5">
+              <p className="text-sm font-medium text-muted-foreground">Doações confirmadas</p>
+              <p className="mt-2 font-[family-name:var(--font-poppins)] text-2xl font-extrabold">{paidDonationCount}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 overflow-x-auto rounded-2xl border border-border">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-background text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Data</th>
+                  <th className="px-4 py-3 font-semibold">Doador</th>
+                  <th className="px-4 py-3 font-semibold">Telefone</th>
+                  <th className="px-4 py-3 font-semibold">Valor</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {donations.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      Nenhuma tentativa de doação online registrada ainda.
+                    </td>
+                  </tr>
+                ) : donations.map((donation) => (
+                  <tr key={donation.id} className="bg-card">
+                    <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatDate(donation.createdAt)}</td>
+                    <td className="px-4 py-3 font-medium">{donation.donorName || 'Anônimo'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{donation.donorPhone || '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {formatCurrency(donation.amount)}
+                      {donation.status === 'partially_refunded' && (
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          Líquido: {formatCurrency(donation.netAmount)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">{donationStatusLabels[donation.status] || donation.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            O total considera pagamentos confirmados no Mercado Pago, descontando devoluções. O PIX manual não está incluído.
+          </p>
+        </section>
 
         {/* Formulário de nova publicação */}
         <form

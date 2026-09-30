@@ -2,6 +2,7 @@ import {
   boolean,
   integer,
   jsonb,
+  numeric,
   pgTable,
   serial,
   text,
@@ -83,6 +84,41 @@ export const transparencyDocuments = pgTable('transparency_documents', {
   originalFilename: text('original_filename').notNull(),
   fileSize: integer('file_size').notNull(),
   uploadedBy: text('uploaded_by').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})
+
+export const donations = pgTable('donations', {
+  id: text('id').primaryKey(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  netAmount: numeric('net_amount', { precision: 12, scale: 2 }).notNull().default('0.00'),
+  donorName: text('donor_name'),
+  donorPhone: text('donor_phone'),
+  externalReference: text('external_reference').notNull().unique(),
+  mercadoPagoOrderId: text('mercadopago_order_id').unique(),
+  checkoutUrl: text('checkout_url'),
+  status: text('status').notNull().default('creating'),
+  statusDetail: text('status_detail'),
+  paidAt: timestamp('paid_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
+export const mercadoPagoConnection = pgTable('mercadopago_connection', {
+  id: integer('id').primaryKey(),
+  sellerId: text('seller_id').notNull(),
+  accessTokenEncrypted: text('access_token_encrypted').notNull(),
+  refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  connectedBy: text('connected_by').notNull(),
+  connectedAt: timestamp('connected_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
+export const mercadoPagoOAuthStates = pgTable('mercadopago_oauth_states', {
+  stateHash: text('state_hash').primaryKey(),
+  codeVerifier: text('code_verifier').notNull(),
+  userId: text('user_id').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
 
